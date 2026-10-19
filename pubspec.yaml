@@ -1,0 +1,49 @@
+name: vasenizzpos
+description: FastPas POS, formerly VaseNizz, a mobile retail point-of-sale app in development.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  intl: ^0.20.2
+  excel: ^4.0.6
+  syncfusion_flutter_datepicker: ^31.2.10
+  pdf: ^3.10.4
+  printing: ^5.11.1
+  path_provider: ^2.1.1
+  open_file: ^3.3.3
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  table_calendar: ^3.0.9
+  fl_chart: ^0.68.0
+  supabase_flutter: ^2.1.2
+  flutter_dotenv: ^5.1.0
+  image_picker: ^1.0.4
+  file_picker: ^10.3.7
+  geolocator: ^11.0.1
+  permission_handler: ^11.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: "^0.13.1"
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"  # Your icon image (1024x1024 recommended)
+  adaptive_icon_background: "#F5C6D3"  # Your pink theme color
+
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/flower.png
