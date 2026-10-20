@@ -1,12 +1,14 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import 'dart:async'; // For TimeoutException
 
 //class GPSValidator {
-  // Replace with your exact store coordinates (get from Google Maps)
-  //static const double storeLatitude = 8.502778; // ← 8°30'10.0"N
-  //static const double storeLongitude = 124.632028; // ← 124°37'55.3"E
-  //static const double allowedRadius = 15.0; // 15 meters precision
+// Replace with your exact store coordinates (get from Google Maps)
+//static const double storeLatitude = 8.502778; // ← 8°30'10.0"N
+//static const double storeLongitude = 124.632028; // ← 124°37'55.3"E
+//static const double allowedRadius = 15.0; // 15 meters precision
 class GPSValidator {
   // Store coordinates in decimal degrees
   static const double storeLatitude = 8.486694444444445; // 8°29'12.1"N
@@ -38,8 +40,8 @@ class GPSValidator {
       );
 
       // Validate GPS accuracy
-      if (position.accuracy == null || position.accuracy! > 20.0) {
-        print('GPS accuracy too low: ${position.accuracy} meters');
+      if (position.accuracy > 20.0) {
+        debugPrint('GPS accuracy too low: ${position.accuracy} meters');
         return false;
       }
 
@@ -51,21 +53,22 @@ class GPSValidator {
         storeLongitude,
       );
 
-      print('=== GPS Validation ===');
-      print('Distance from store: ${distance.toStringAsFixed(2)} meters');
-      print('GPS accuracy: ${position.accuracy?.toStringAsFixed(2)} meters');
-      print('Required accuracy: < 20.0 meters');
-      print('Allowed radius: $allowedRadius meters');
-      print('Validation result: ${distance <= allowedRadius}');
-      print('=====================');
+      debugPrint('=== GPS Validation ===');
+      debugPrint('Distance from store: ${distance.toStringAsFixed(2)} meters');
+      debugPrint(
+        'GPS accuracy: ${position.accuracy.toStringAsFixed(2)} meters',
+      );
+      debugPrint('Required accuracy: < 20.0 meters');
+      debugPrint('Allowed radius: $allowedRadius meters');
+      debugPrint('Validation result: ${distance <= allowedRadius}');
+      debugPrint('=====================');
 
       return distance <= allowedRadius;
-
     } on TimeoutException catch (e) {
-      print('GPS timeout: $e');
+      debugPrint('GPS timeout: $e');
       return false;
     } catch (e) {
-      print('GPS validation error: $e');
+      debugPrint('GPS validation error: $e');
       return false;
     }
   }
@@ -77,12 +80,12 @@ class GPSValidator {
         desiredAccuracy: LocationAccuracy.bestForNavigation,
       );
 
-      print('=== YOUR STORE COORDINATES ===');
-      print('Latitude: ${position.latitude}');
-      print('Longitude: ${position.longitude}');
-      print('=============================');
+      debugPrint('=== YOUR STORE COORDINATES ===');
+      debugPrint('Latitude: ${position.latitude}');
+      debugPrint('Longitude: ${position.longitude}');
+      debugPrint('=============================');
     } catch (e) {
-      print('Error getting coordinates: $e');
+      debugPrint('Error getting coordinates: $e');
     }
   }
 }

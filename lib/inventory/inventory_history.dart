@@ -1,3 +1,6 @@
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,11 +10,11 @@ class InventoryHistoryScreen extends StatefulWidget {
   final String userId;
 
   const InventoryHistoryScreen({
-    Key? key,
+    super.key,
     required this.fullName,
     required this.role,
     required this.userId,
-  }) : super(key: key);
+  });
 
   @override
   State<InventoryHistoryScreen> createState() => _InventoryHistoryScreenState();
@@ -19,7 +22,7 @@ class InventoryHistoryScreen extends StatefulWidget {
 
 class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
 
   List<dynamic> _historyData = [];
   List<dynamic> _filteredData = [];
@@ -54,8 +57,10 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
       _filteredData = _historyData;
     } else {
       _filteredData = _historyData.where((item) {
-        final productName = item['product_name']?.toString().toLowerCase() ?? '';
-        final movementType = item['movement_type']?.toString().toLowerCase() ?? '';
+        final productName =
+            item['product_name']?.toString().toLowerCase() ?? '';
+        final movementType =
+            item['movement_type']?.toString().toLowerCase() ?? '';
         final reason = item['reason']?.toString().toLowerCase() ?? '';
         final user = item['employee_name']?.toString().toLowerCase() ?? '';
         final sku = item['product_sku']?.toString().toLowerCase() ?? '';
@@ -79,7 +84,8 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
     }
 
     try {
-      final from = (loadMore ? _currentPage : 0) * _pageSize; // Fixed calculation
+      final from =
+          (loadMore ? _currentPage : 0) * _pageSize; // Fixed calculation
 
       final data = await _supabase
           .from('inventory_movements')
@@ -152,10 +158,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -191,36 +194,53 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
 
   String _getMovementTypeText(String type) {
     switch (type) {
-      case 'in': return 'Stock In';
-      case 'out': return 'Stock Out';
-      case 'sold': return 'Sold';
-      case 'adjustment': return 'Adjustment';
-      case 'transfer': return 'Transfer';
-      default: return type;
+      case 'in':
+        return 'Stock In';
+      case 'out':
+        return 'Stock Out';
+      case 'sold':
+        return 'Sold';
+      case 'adjustment':
+        return 'Adjustment';
+      case 'transfer':
+        return 'Transfer';
+      default:
+        return type;
     }
   }
 
   Color _getMovementColor(String type) {
     switch (type) {
-      case 'in': return Colors.green;
+      case 'in':
+        return Colors.green;
       case 'out':
-      case 'sold': return Colors.red;
-      case 'adjustment': return Colors.orange;
-      case 'transfer': return Colors.blue;
-      default: return Colors.grey;
+      case 'sold':
+        return Colors.red;
+      case 'adjustment':
+        return Colors.orange;
+      case 'transfer':
+        return Colors.blue;
+      default:
+        return Colors.grey;
     }
   }
 
   String _getQuantityDisplay(String type, dynamic quantity) {
-    final qty = quantity is int ? quantity : int.tryParse(quantity.toString()) ?? 0;
+    final qty = quantity is int
+        ? quantity
+        : int.tryParse(quantity.toString()) ?? 0;
     switch (type) {
-      case 'in': return '+$qty';
+      case 'in':
+        return '+$qty';
       case 'out':
-      case 'sold': return '-$qty';
+      case 'sold':
+        return '-$qty';
       case 'adjustment':
         return qty >= 0 ? '+$qty' : '$qty';
-      case 'transfer': return '→$qty';
-      default: return qty.toString();
+      case 'transfer':
+        return '→$qty';
+      default:
+        return qty.toString();
     }
   }
 
@@ -233,10 +253,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
       children: [
         Text(
           '$previousStock',
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 12,
-          ),
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
         ),
         Icon(
           isPositive ? Icons.arrow_upward : Icons.arrow_downward,
@@ -258,39 +275,17 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5C6D3),
+        backgroundColor: Volt.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black54),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Row(
-          children: [
-            const CircleAvatar(
-              backgroundImage: AssetImage('assets/logo.png'),
-              radius: 22,
-              backgroundColor: Colors.white,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Inventory History",
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87),
-                ),
-                Text(
-                  "${widget.fullName} (${widget.role})",
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-              ],
-            ),
-          ],
+        title: ManagementTitle(
+          'Stock history',
+          subtitle: '${widget.fullName} · ${widget.role}',
         ),
         actions: [
           IconButton(
@@ -309,7 +304,9 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 3)],
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 3),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,7 +319,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8EDF3),
+                      color: Volt.background,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: TextField(
@@ -330,7 +327,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
                       decoration: InputDecoration(
                         hintText: 'Search by product, type, reason, or user...',
                         border: InputBorder.none,
-                        suffixIcon: Icon(Icons.search, color: Colors.pink.shade300),
+                        suffixIcon: Icon(Icons.search, color: Volt.ink),
                       ),
                     ),
                   ),
@@ -342,143 +339,279 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
           // History Table
           Expanded(
             child: _isLoading && _historyData.isEmpty
-                ? const Center(child: CircularProgressIndicator(color: Colors.pink))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Volt.ink),
+                  )
                 : _filteredData.isEmpty
                 ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'No inventory movements found',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                  Text(
-                    'Inventory movements will appear here',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            )
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No inventory movements found',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        Text(
+                          'Inventory movements will appear here',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
                 : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 3)],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            "Stock Movement History",
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          const Spacer(),
-                          Text(
-                            "Total: ${_filteredData.length} records",
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 20, color: Colors.black26),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columnSpacing: 24,
-                          columns: const [
-                            DataColumn(label: Text("Date", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Time", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Product", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Type", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Qty", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Stock Change", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("User", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Reason", style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("SKU", style: TextStyle(fontWeight: FontWeight.bold))),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 3),
                           ],
-                          rows: [
-                            ..._filteredData.map((item) {
-                              final movementType = item['movement_type']?.toString() ?? '';
-                              final quantity = item['quantity'] ?? 0;
-                              final previousStock = item['previous_stock'] ?? 0;
-                              final newStock = item['new_stock'] ?? 0;
-
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(_formatDate(item['created_at']?.toString() ?? ''))),
-                                  DataCell(Text(_formatTime(item['created_at']?.toString() ?? ''))),
-                                  DataCell(Text(item['product_name']?.toString() ?? 'N/A')),
-                                  DataCell(Text(
-                                    _getMovementTypeText(movementType),
-                                    style: TextStyle(color: _getMovementColor(movementType), fontWeight: FontWeight.bold),
-                                  )),
-                                  DataCell(Text(
-                                    _getQuantityDisplay(movementType, quantity),
-                                    style: TextStyle(
-                                      color: _getMovementColor(movementType),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )),
-                                  DataCell(_buildStockChangeWidget(movementType, previousStock, newStock)),
-                                  DataCell(Text(item['employee_name']?.toString() ?? 'N/A')),
-                                  DataCell(Text(item['reason']?.toString() ?? 'N/A')),
-                                  DataCell(Text(item['product_sku']?.toString() ?? 'N/A')),
-                                ],
-                              );
-                            }).toList(),
-                            if (_hasMore && !_isLoading)
-                              DataRow(
-                                cells: [
-                                  DataCell(
-                                    SizedBox(
-                                      width: 120,
-                                      child: TextButton(
-                                        onPressed: _loadMoreData,
-                                        child: const Text('Load More...'),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Text(
+                                  "Stock Movement History",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  "Total: ${_filteredData.length} records",
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 20, color: Colors.black26),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columnSpacing: 24,
+                                columns: const [
+                                  DataColumn(
+                                    label: Text(
+                                      "Date",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                ],
-                              ),
-                            if (_isLoading && _historyData.isNotEmpty)
-                              DataRow(
-                                cells: [
-                                  DataCell(
-                                    const Center(child: CircularProgressIndicator(color: Colors.pink)),
+                                  DataColumn(
+                                    label: Text(
+                                      "Time",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
+                                  DataColumn(
+                                    label: Text(
+                                      "Product",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "Type",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "Qty",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "Stock Change",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "User",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "Reason",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "SKU",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                rows: [
+                                  ..._filteredData.map((item) {
+                                    final movementType =
+                                        item['movement_type']?.toString() ?? '';
+                                    final quantity = item['quantity'] ?? 0;
+                                    final previousStock =
+                                        item['previous_stock'] ?? 0;
+                                    final newStock = item['new_stock'] ?? 0;
+
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(
+                                          Text(
+                                            _formatDate(
+                                              item['created_at']?.toString() ??
+                                                  '',
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            _formatTime(
+                                              item['created_at']?.toString() ??
+                                                  '',
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            item['product_name']?.toString() ??
+                                                'N/A',
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            _getMovementTypeText(movementType),
+                                            style: TextStyle(
+                                              color: _getMovementColor(
+                                                movementType,
+                                              ),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            _getQuantityDisplay(
+                                              movementType,
+                                              quantity,
+                                            ),
+                                            style: TextStyle(
+                                              color: _getMovementColor(
+                                                movementType,
+                                              ),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        DataCell(
+                                          _buildStockChangeWidget(
+                                            movementType,
+                                            previousStock,
+                                            newStock,
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            item['employee_name']?.toString() ??
+                                                'N/A',
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            item['reason']?.toString() ?? 'N/A',
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            item['product_sku']?.toString() ??
+                                                'N/A',
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                  if (_hasMore && !_isLoading)
+                                    DataRow(
+                                      cells: [
+                                        DataCell(
+                                          SizedBox(
+                                            width: 120,
+                                            child: TextButton(
+                                              onPressed: _loadMoreData,
+                                              child: const Text('Load More...'),
+                                            ),
+                                          ),
+                                        ),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                      ],
+                                    ),
+                                  if (_isLoading && _historyData.isNotEmpty)
+                                    DataRow(
+                                      cells: [
+                                        DataCell(
+                                          const Center(
+                                            child: CircularProgressIndicator(
+                                              color: Volt.ink,
+                                            ),
+                                          ),
+                                        ),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                        const DataCell(Text('')),
+                                      ],
+                                    ),
                                 ],
                               ),
+                            ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),

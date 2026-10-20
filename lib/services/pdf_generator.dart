@@ -1,13 +1,16 @@
 import 'dart:io';
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
+
 import '../reports/generate_report_page.dart'; // This imports DateTimeRange from the same file
 
-
 class PDFGenerator {
-  Future<File> generateSalesReport(DateTimeRange dateRange, List<Map<String, dynamic>> salesData) async {
+  Future<File> generateSalesReport(
+    DateTimeRange dateRange,
+    List<Map<String, dynamic>> salesData,
+  ) async {
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -23,10 +26,15 @@ class PDFGenerator {
       ),
     );
 
-    return await _savePDF(pdf, 'sales_report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    return await _savePDF(
+      pdf,
+      'sales_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
   }
 
-  Future<File> generateInventoryReport(List<Map<String, dynamic>> inventoryData) async {
+  Future<File> generateInventoryReport(
+    List<Map<String, dynamic>> inventoryData,
+  ) async {
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -42,10 +50,16 @@ class PDFGenerator {
       ),
     );
 
-    return await _savePDF(pdf, 'inventory_report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    return await _savePDF(
+      pdf,
+      'inventory_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
   }
 
-  Future<File> generateAttendanceReport(DateTimeRange dateRange, List<Map<String, dynamic>> attendanceData) async {
+  Future<File> generateAttendanceReport(
+    DateTimeRange dateRange,
+    List<Map<String, dynamic>> attendanceData,
+  ) async {
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -61,7 +75,10 @@ class PDFGenerator {
       ),
     );
 
-    return await _savePDF(pdf, 'attendance_report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    return await _savePDF(
+      pdf,
+      'attendance_report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
   }
 
   pw.Widget _buildHeader(String title, DateTimeRange? dateRange) {
@@ -71,7 +88,7 @@ class PDFGenerator {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'Vasenizz POS',
+              'FastPas POS',
               style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
             ),
             pw.Text(
@@ -111,7 +128,10 @@ class PDFGenerator {
         children: [
           _buildSummaryItem('Total Sales', 'P${totalSales.toStringAsFixed(2)}'),
           _buildSummaryItem('Total Orders', totalOrders.toString()),
-          _buildSummaryItem('Average Order', 'P${(totalSales / (totalOrders == 0 ? 1 : totalOrders)).toStringAsFixed(2)}'),
+          _buildSummaryItem(
+            'Average Order',
+            'P${(totalSales / (totalOrders == 0 ? 1 : totalOrders)).toStringAsFixed(2)}',
+          ),
         ],
       ),
     );
@@ -122,13 +142,17 @@ class PDFGenerator {
 
     return pw.TableHelper.fromTextArray(
       headers: headers,
-      data: salesData.map((sale) => [
-        _formatDate(DateTime.parse(sale['created_at'])),
-        sale['id']?.toString() ?? 'N/A',
-        sale['branch_location'] ?? 'Main',
-        'P${(sale['total_amount'] ?? 0.0).toStringAsFixed(2)}',
-        (sale['item_count'] ?? 'N/A').toString(),
-      ]).toList(),
+      data: salesData
+          .map(
+            (sale) => [
+              _formatDate(DateTime.parse(sale['created_at'])),
+              sale['id']?.toString() ?? 'N/A',
+              sale['branch_location'] ?? 'Main',
+              'P${(sale['total_amount'] ?? 0.0).toStringAsFixed(2)}',
+              (sale['item_count'] ?? 'N/A').toString(),
+            ],
+          )
+          .toList(),
       headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
       cellAlignment: pw.Alignment.centerLeft,
     );
@@ -136,7 +160,9 @@ class PDFGenerator {
 
   pw.Widget _buildInventorySummary(List<Map<String, dynamic>> inventoryData) {
     int totalProducts = inventoryData.length;
-    int lowStockCount = inventoryData.where((item) => (item['total_stock'] ?? 0) < 8).length;
+    int lowStockCount = inventoryData
+        .where((item) => (item['total_stock'] ?? 0) < 8)
+        .length;
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(15),
@@ -149,7 +175,10 @@ class PDFGenerator {
         children: [
           _buildSummaryItem('Total Products', totalProducts.toString()),
           _buildSummaryItem('Low Stock Items', lowStockCount.toString()),
-          _buildSummaryItem('Total Value', _calculateInventoryValue(inventoryData)),
+          _buildSummaryItem(
+            'Total Value',
+            _calculateInventoryValue(inventoryData),
+          ),
         ],
       ),
     );
@@ -162,8 +191,16 @@ class PDFGenerator {
       headers: headers,
       data: inventoryData.map((item) {
         final stock = item['total_stock'] ?? 0;
-        final status = stock == 0 ? 'OUT OF STOCK' : stock <= 8 ? 'LOW STOCK' : 'IN STOCK';
-        final statusColor = stock == 0 ? PdfColors.red : stock <= 8 ? PdfColors.orange : PdfColors.green;
+        final status = stock == 0
+            ? 'OUT OF STOCK'
+            : stock <= 8
+            ? 'LOW STOCK'
+            : 'IN STOCK';
+        final statusColor = stock == 0
+            ? PdfColors.red
+            : stock <= 8
+            ? PdfColors.orange
+            : PdfColors.green;
 
         return [
           item['name'] ?? 'N/A',
@@ -172,7 +209,10 @@ class PDFGenerator {
           'P${(item['price'] ?? 0.0).toStringAsFixed(2)}',
           pw.Text(
             status,
-            style: pw.TextStyle(color: statusColor, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+              color: statusColor,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
         ];
       }).toList(),
@@ -183,7 +223,9 @@ class PDFGenerator {
 
   pw.Widget _buildAttendanceSummary(List<Map<String, dynamic>> attendanceData) {
     int totalRecords = attendanceData.length;
-    int completedShifts = attendanceData.where((record) => record['time_out'] != null).length;
+    int completedShifts = attendanceData
+        .where((record) => record['time_out'] != null)
+        .length;
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(15),
@@ -196,7 +238,10 @@ class PDFGenerator {
         children: [
           _buildSummaryItem('Total Records', totalRecords.toString()),
           _buildSummaryItem('Completed Shifts', completedShifts.toString()),
-          _buildSummaryItem('Pending Time Out', (totalRecords - completedShifts).toString()),
+          _buildSummaryItem(
+            'Pending Time Out',
+            (totalRecords - completedShifts).toString(),
+          ),
         ],
       ),
     );
@@ -208,9 +253,15 @@ class PDFGenerator {
     return pw.TableHelper.fromTextArray(
       headers: headers,
       data: attendanceData.map((record) {
-        final employee = record['employees'] is Map ? record['employees']['name'] : 'N/A';
-        final timeIn = record['time_in'] != null ? _formatTime(DateTime.parse(record['time_in'])) : 'N/A';
-        final timeOut = record['time_out'] != null ? _formatTime(DateTime.parse(record['time_out'])) : 'Pending';
+        final employee = record['employees'] is Map
+            ? record['employees']['name']
+            : 'N/A';
+        final timeIn = record['time_in'] != null
+            ? _formatTime(DateTime.parse(record['time_in']))
+            : 'N/A';
+        final timeOut = record['time_out'] != null
+            ? _formatTime(DateTime.parse(record['time_out']))
+            : 'Pending';
 
         return [
           record['date'] ?? 'N/A',

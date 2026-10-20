@@ -1,3 +1,6 @@
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -17,7 +20,7 @@ class EmployeeProfilePage extends StatefulWidget {
 
 class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
   Map<String, dynamic>? employeeData;
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
@@ -37,7 +40,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
 
   Future<void> _fetchEmployee() async {
     try {
-      print('Fetching employee with user_id: ${widget.userId}');
+      debugPrint('Fetching employee with user_id: ${widget.userId}');
 
       final response = await _supabase
           .from('employees')
@@ -63,7 +66,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
         });
       }
     } catch (e) {
-      print('Error fetching employee: $e');
+      debugPrint('Error fetching employee: $e');
       setState(() {
         errorMessage = 'Error loading employee data';
         isLoading = false;
@@ -89,7 +92,9 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
       final updates = {
         'name': nameController.text.trim(),
         'phone': phoneController.text.trim(),
-        'dob': dobController.text.trim().isNotEmpty ? dobController.text.trim() : null,
+        'dob': dobController.text.trim().isNotEmpty
+            ? dobController.text.trim()
+            : null,
         'username': usernameController.text.trim(),
         'branch': branchController.text.trim(),
         'role': roleController.text.trim(),
@@ -101,6 +106,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
           .update(updates)
           .eq('user_id', widget.userId);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Employee updated successfully'),
@@ -109,8 +115,8 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
       );
 
       await _fetchEmployee();
-
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error updating employee: ${e.toString()}'),
@@ -121,23 +127,30 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
   }
 
   Future<void> _deleteEmployee() async {
-    bool confirmDelete = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Deactivate Employee"),
-        content: Text("Are you sure you want to deactivate ${nameController.text}? They will no longer be able to access the system."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
+    bool confirmDelete =
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Deactivate Employee"),
+            content: Text(
+              "Are you sure you want to deactivate ${nameController.text}? They will no longer be able to access the system.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  "Deactivate",
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Deactivate", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
 
     if (!confirmDelete) return;
 
@@ -145,11 +158,12 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
       await _supabase
           .from('employees')
           .update({
-        'is_active': false,
-        'updated_at': DateTime.now().toIso8601String(),
-      })
+            'is_active': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('user_id', widget.userId);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Employee deactivated successfully'),
@@ -157,9 +171,10 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
         ),
       );
 
+      if (!mounted) return;
       Navigator.pop(context);
-
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error deactivating employee: ${e.toString()}'),
@@ -172,9 +187,9 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: Color(0xFFF5C6D3),
+        backgroundColor: Volt.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -198,223 +213,251 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
       ),
       body: isLoading
           ? const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Loading employee data...',
-              style: TextStyle(color: Colors.black54),
-            ),
-          ],
-        ),
-      )
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading employee data...',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ],
+              ),
+            )
           : errorMessage.isNotEmpty
           ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              errorMessage,
-              style: const TextStyle(fontSize: 16, color: Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _fetchEmployee,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFA0C0),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              child: const Text('Try Again'),
-            ),
-          ],
-        ),
-      )
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Profile Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Color(0xFFF8EDF3),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF0F5),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFFFA0C0),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      size: 40,
-                      color: Color(0xFFFF6B8A),
-                    ),
-                  ),
+                  Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    employeeData!['name'] ?? 'No Name',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+                    errorMessage,
+                    style: const TextStyle(fontSize: 16, color: Colors.black54),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    employeeData!['role']?.toString().toUpperCase() ?? 'NO ROLE',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'User ID: ${widget.userId}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Employee Details Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Color(0xFFF5C6D3),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Employee Information',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Divider(color: Colors.grey, height: 24),
-                  const SizedBox(height: 8),
-
-                  _buildInfoField("Full Name", nameController, Icons.person_outline),
-                  _buildInfoField("Phone Number", phoneController, Icons.phone_iphone),
-                  _buildInfoField("Date of Birth", dobController, Icons.calendar_today),
-                  _buildInfoField("Username", usernameController, Icons.alternate_email),
-                  _buildInfoField("Branch", branchController, Icons.business),
-                  _buildInfoField("Role", roleController, Icons.work_outline),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _deleteEmployee,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Color(0xFFFF6B8A)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.person_off, color: Color(0xFFFF6B8A), size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          "Deactivate",
-                          style: TextStyle(
-                            color: Color(0xFFFF6B8A),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _updateEmployee,
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _fetchEmployee,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF6B8A),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      backgroundColor: Volt.line,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
                       ),
-                      elevation: 2,
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // Profile Header
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Volt.background,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
                       children: [
-                        Icon(Icons.save, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Volt.soft,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Volt.line, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            size: 40,
+                            color: Volt.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Text(
-                          "Save Changes",
-                          style: TextStyle(
-                            color: Colors.white,
+                          employeeData!['name'] ?? 'No Name',
+                          style: const TextStyle(
+                            fontSize: 20,
                             fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          employeeData!['role']?.toString().toUpperCase() ??
+                              'NO ROLE',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'User ID: ${widget.userId}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
 
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+                  const SizedBox(height: 24),
+
+                  // Employee Details Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Volt.soft,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Employee Information',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Divider(color: Colors.grey, height: 24),
+                        const SizedBox(height: 8),
+                        _buildInfoField(
+                          "Full Name",
+                          nameController,
+                          Icons.person_outline,
+                        ),
+                        _buildInfoField(
+                          "Phone Number",
+                          phoneController,
+                          Icons.phone_iphone,
+                        ),
+                        _buildInfoField(
+                          "Date of Birth",
+                          dobController,
+                          Icons.calendar_today,
+                        ),
+                        _buildInfoField(
+                          "Username",
+                          usernameController,
+                          Icons.alternate_email,
+                        ),
+                        _buildInfoField(
+                          "Branch",
+                          branchController,
+                          Icons.business,
+                        ),
+                        _buildInfoField(
+                          "Role",
+                          roleController,
+                          Icons.work_outline,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Action Buttons
+                  ManagementColumns(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _deleteEmployee,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: const BorderSide(color: Volt.ink),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_off, color: Volt.ink, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                "Deactivate",
+                                style: TextStyle(
+                                  color: Volt.ink,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _updateEmployee,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Volt.ink,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.save, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                "Save Changes",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
     );
   }
 
-  Widget _buildInfoField(String label, TextEditingController controller, IconData icon) {
+  Widget _buildInfoField(
+    String label,
+    TextEditingController controller,
+    IconData icon,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -432,11 +475,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
           TextField(
             controller: controller,
             decoration: InputDecoration(
-              prefixIcon: Icon(
-                icon,
-                color: const Color(0xFFFF6B8A),
-                size: 20,
-              ),
+              prefixIcon: Icon(icon, color: Volt.ink, size: 20),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: Colors.grey[300]!),
@@ -447,16 +486,16 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFFFF6B8A)),
+                borderSide: const BorderSide(color: Volt.ink),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 14,
+                horizontal: 16,
+              ),
               fillColor: Colors.grey[50],
               filled: true,
             ),
-            style: const TextStyle(
-              fontSize: 15,
-              color: Colors.black87,
-            ),
+            style: const TextStyle(fontSize: 15, color: Colors.black87),
           ),
         ],
       ),

@@ -1,3 +1,5 @@
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vasenizzpos/suppliers/supplier_products_screen.dart';
@@ -19,7 +21,7 @@ class SuppliersScreen extends StatefulWidget {
 }
 
 class _SuppliersScreenState extends State<SuppliersScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
   List<Map<String, dynamic>> _suppliers = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -30,8 +32,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     super.initState();
     _loadSuppliers();
   }
-
-
 
   Future<void> _loadSuppliers() async {
     setState(() => _isLoading = true);
@@ -52,7 +52,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         setState(() => _suppliers = List<Map<String, dynamic>>.from(data));
       }
     } catch (e) {
-      print('Error loading suppliers: $e');
+      debugPrint('Error loading suppliers: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -61,9 +61,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   void _showAddSupplierDialog() {
     showDialog(
       context: context,
-      builder: (context) => AddSupplierDialog(
-        onSupplierAdded: _loadSuppliers,
-      ),
+      builder: (context) => AddSupplierDialog(onSupplierAdded: _loadSuppliers),
     );
   }
 
@@ -115,6 +113,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       try {
         await _supabase.from('suppliers').delete().eq('id', id);
         _loadSuppliers();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Supplier deleted'),
@@ -122,6 +121,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ),
         );
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error deleting supplier: $e'),
@@ -135,17 +135,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5C6D3),
+        backgroundColor: Volt.background,
         title: const Text(
           'Suppliers',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
@@ -170,23 +168,26 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search suppliers...',
-                prefixIcon: const Icon(Icons.search, color: Colors.pink),
+                prefixIcon: const Icon(Icons.search, color: Volt.ink),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 15,
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.pink),
-                  onPressed: () {
-                    _searchController.clear();
-                    _searchQuery = '';
-                    _loadSuppliers();
-                  },
-                )
+                        icon: const Icon(Icons.clear, color: Volt.ink),
+                        onPressed: () {
+                          _searchController.clear();
+                          _searchQuery = '';
+                          _loadSuppliers();
+                        },
+                      )
                     : null,
               ),
               onChanged: (value) {
@@ -197,13 +198,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+            child: Wrap(
               children: [
                 Text(
                   'Total Suppliers: ${_suppliers.length}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.pink,
+                    color: Volt.ink,
                   ),
                 ),
               ],
@@ -212,139 +213,144 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.pink))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Volt.ink),
+                  )
                 : _suppliers.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.local_shipping, size: 80, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No suppliers found',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.local_shipping,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No suppliers found',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                        if (_searchQuery.isNotEmpty)
+                          TextButton(
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchQuery = '';
+                              _loadSuppliers();
+                            },
+                            child: const Text('Clear search'),
+                          ),
+                      ],
                     ),
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    TextButton(
-                      onPressed: () {
-                        _searchController.clear();
-                        _searchQuery = '';
-                        _loadSuppliers();
-                      },
-                      child: const Text('Clear search'),
-                    ),
-                ],
-              ),
-            )
+                  )
                 : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _suppliers.length,
-              itemBuilder: (context, index) {
-                final supplier = _suppliers[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.pink[100],
-                      child: const Icon(
-                        Icons.business,
-                        color: Colors.pink,
-                      ),
-                    ),
-                    title: Text(
-                      supplier['name'] ?? 'Unknown',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (supplier['contact_person'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Contact: ${supplier['contact_person']}',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        if (supplier['phone'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              'Phone: ${supplier['phone']}',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        if (supplier['email'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              'Email: ${supplier['email']}',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.inventory, color: Colors.pink),
-                          onPressed: () {
-                            _navigateToSupplierProducts(supplier);
-                          },
-                          tooltip: 'View Products',
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _suppliers.length,
+                    itemBuilder: (context, index) {
+                      final supplier = _suppliers[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        PopupMenuButton<String>(
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit, size: 20, color: Colors.blue),
-                                  SizedBox(width: 8),
-                                  Text('Edit'),
-                                ],
-                              ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          leading: null,
+                          title: Text(
+                            supplier['name'] ?? 'Unknown',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete, size: 20, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('Delete'),
-                                ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (supplier['contact_person'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    'Contact: ${supplier['contact_person']}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              if (supplier['phone'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    'Phone: ${supplier['phone']}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              if (supplier['email'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    'Email: ${supplier['email']}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.inventory, color: Volt.ink),
+                                onPressed: () {
+                                  _navigateToSupplierProducts(supplier);
+                                },
+                                tooltip: 'View Products',
                               ),
-                            ),
-                          ],
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              _showEditSupplierDialog(supplier);
-                            } else if (value == 'delete') {
-                              _deleteSupplier(
-                                supplier['id'],
-                                supplier['name'] ?? 'Supplier',
-                              );
-                            }
-                          },
+                              PopupMenuButton<String>(
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.edit,
+                                          size: 20,
+                                          color: Colors.blue,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('Edit'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete,
+                                          size: 20,
+                                          color: Colors.red,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('Delete'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _showEditSupplierDialog(supplier);
+                                  } else if (value == 'delete') {
+                                    _deleteSupplier(
+                                      supplier['id'],
+                                      supplier['name'] ?? 'Supplier',
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -372,7 +378,7 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
   final _contactController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
   bool _isLoading = false;
 
   @override
@@ -422,9 +428,11 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.supplier != null
-              ? 'Supplier updated successfully!'
-              : 'Supplier added successfully!'),
+          content: Text(
+            widget.supplier != null
+                ? 'Supplier updated successfully!'
+                : 'Supplier added successfully!',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -447,10 +455,8 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
@@ -463,7 +469,7 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.pink,
+                  color: Volt.ink,
                 ),
               ),
               const SizedBox(height: 20),
@@ -472,7 +478,7 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Supplier Name *',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.business, color: Colors.pink),
+                  prefixIcon: Icon(Icons.business, color: Volt.ink),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -487,7 +493,7 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Contact Person',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person, color: Colors.pink),
+                  prefixIcon: Icon(Icons.person, color: Volt.ink),
                 ),
               ),
               const SizedBox(height: 16),
@@ -496,7 +502,7 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Phone Number',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone, color: Colors.pink),
+                  prefixIcon: Icon(Icons.phone, color: Volt.ink),
                 ),
                 keyboardType: TextInputType.phone,
               ),
@@ -506,7 +512,7 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Email Address',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email, color: Colors.pink),
+                  prefixIcon: Icon(Icons.email, color: Volt.ink),
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
@@ -515,7 +521,9 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -524,18 +532,23 @@ class _AddSupplierDialogState extends State<AddSupplierDialog> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _saveSupplier,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.pink,
+                        backgroundColor: Volt.ink,
                       ),
                       child: _isLoading
                           ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                        ),
-                      )
-                          : const Text('Save', style: TextStyle(color: Colors.white)),
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Save',
+                              style: TextStyle(color: Colors.white),
+                            ),
                     ),
                   ),
                 ],

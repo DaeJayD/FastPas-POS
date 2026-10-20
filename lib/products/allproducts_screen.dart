@@ -1,21 +1,25 @@
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AllProductsInventoryScreen extends StatefulWidget {
   final String fullName;
   final String role;
 
   const AllProductsInventoryScreen({
-    Key? key,
+    super.key,
     required this.fullName,
     required this.role,
-  }) : super(key: key);
+  });
 
   @override
-  State<AllProductsInventoryScreen> createState() => _AllProductsInventoryScreenState();
+  State<AllProductsInventoryScreen> createState() =>
+      _AllProductsInventoryScreenState();
 }
 
-class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen> {
+class _AllProductsInventoryScreenState
+    extends State<AllProductsInventoryScreen> {
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _filteredProducts = [];
   List<Map<String, dynamic>> _brands = [];
@@ -29,7 +33,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
   String _sortBy = 'name'; // 'name', 'stock', 'sku'
   String? _selectedBrandId;
   String _viewMode = 'all'; // 'all', 'byBrand'
-  Map<String, List<Map<String, dynamic>>> _productsByBrand = {};
+  final Map<String, List<Map<String, dynamic>>> _productsByBrand = {};
 
   @override
   void initState() {
@@ -45,12 +49,9 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
     });
 
     try {
-      await Future.wait([
-        _loadBrands(),
-        _loadProducts(),
-      ]);
+      await Future.wait([_loadBrands(), _loadProducts()]);
     } catch (e) {
-      print('Error loading initial data: $e');
+      debugPrint('Error loading initial data: $e');
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -60,7 +61,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
 
   Future<void> _loadBrands() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await StoreConnection.client
           .from('brands')
           .select('*')
           .order('name');
@@ -69,7 +70,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
         _brands = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      print('Error loading brands: $e');
+      debugPrint('Error loading brands: $e');
     }
   }
 
@@ -93,9 +94,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
       final to = from + _pageSize - 1;
 
       // Build query with brand and category information
-      var query = Supabase.instance.client
-          .from('products')
-          .select('''
+      var query = StoreConnection.client.from('products').select('''
           *,
           brands:brand_id(*),
           categories:category_id(*),
@@ -111,11 +110,11 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
       }
 
       // Add ordering and range
-      final response = await query
-          .order('name')
-          .range(from, to);
+      final response = await query.order('name').range(from, to);
 
-      List<Map<String, dynamic>> products = List<Map<String, dynamic>>.from(response);
+      List<Map<String, dynamic>> products = List<Map<String, dynamic>>.from(
+        response,
+      );
 
       // Process products to calculate branch stock
       for (var product in products) {
@@ -151,7 +150,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
         if (loadMore) _currentPage++;
       });
     } catch (e) {
-      print('Error loading products: $e');
+      debugPrint('Error loading products: $e');
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -223,8 +222,10 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
         _filteredProducts = _products.where((product) {
           final productName = product['name']?.toString().toLowerCase() ?? '';
           final productSku = product['sku']?.toString().toLowerCase() ?? '';
-          final brandName = product['brands']?['name']?.toString().toLowerCase() ?? '';
-          final categoryName = product['categories']?['name']?.toString().toLowerCase() ?? '';
+          final brandName =
+              product['brands']?['name']?.toString().toLowerCase() ?? '';
+          final categoryName =
+              product['categories']?['name']?.toString().toLowerCase() ?? '';
 
           return productName.contains(query) ||
               productSku.contains(query) ||
@@ -267,59 +268,35 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5C6D3),
+        backgroundColor: Volt.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Volt.ink),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Row(
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundImage: AssetImage("assets/logo.png"),
-              backgroundColor: Colors.white,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "All Products Inventory",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                Text(
-                  "${widget.fullName} (${widget.role})",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        title: ManagementTitle(
+          'Products',
+          subtitle: '${widget.fullName} · ${widget.role}',
         ),
         actions: [
           IconButton(
             icon: Icon(
               _viewMode == 'all' ? Icons.view_list : Icons.category,
-              color: Colors.white,
+              color: Volt.ink,
             ),
             onPressed: _toggleViewMode,
-            tooltip: _viewMode == 'all' ? 'Group by Brand' : 'Show All Products',
+            tooltip: _viewMode == 'all'
+                ? 'Group by Brand'
+                : 'Show All Products',
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+            icon: const Icon(Icons.notifications_none_rounded, color: Volt.ink),
             onPressed: () {},
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: const Icon(Icons.refresh, color: Volt.ink),
             onPressed: _loadInitialData,
           ),
         ],
@@ -335,7 +312,8 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: "Search products by name, SKU, brand, or category",
+                    hintText:
+                        "Search products by name, SKU, brand, or category",
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -365,13 +343,21 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                             value: _selectedBrandId,
                             isExpanded: true,
                             icon: const Icon(Icons.filter_list, size: 18),
-                            hint: const Text('All Brands', style: TextStyle(fontSize: 14)),
+                            hint: const Text(
+                              'All Brands',
+                              style: TextStyle(fontSize: 14),
+                            ),
                             items: [
                               const DropdownMenuItem<String?>(
                                 value: null,
-                                child: Text('All Brands', style: TextStyle(fontSize: 14)),
+                                child: Text(
+                                  'All Brands',
+                                  style: TextStyle(fontSize: 14),
+                                ),
                               ),
-                              ..._brands.map<DropdownMenuItem<String?>>((brand) {
+                              ..._brands.map<DropdownMenuItem<String?>>((
+                                brand,
+                              ) {
                                 return DropdownMenuItem<String?>(
                                   value: brand['id'] as String?,
                                   child: Text(
@@ -381,7 +367,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 );
-                              }).toList(),
+                              }),
                             ],
                             onChanged: _changeBrandFilter,
                           ),
@@ -408,15 +394,24 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                             items: const [
                               DropdownMenuItem<String>(
                                 value: 'name',
-                                child: Text('Sort by Name', style: TextStyle(fontSize: 14)),
+                                child: Text(
+                                  'Sort by Name',
+                                  style: TextStyle(fontSize: 14),
+                                ),
                               ),
                               DropdownMenuItem<String>(
                                 value: 'sku',
-                                child: Text('Sort by SKU', style: TextStyle(fontSize: 14)),
+                                child: Text(
+                                  'Sort by SKU',
+                                  style: TextStyle(fontSize: 14),
+                                ),
                               ),
                               DropdownMenuItem<String>(
                                 value: 'stock',
-                                child: Text('Sort by Stock', style: TextStyle(fontSize: 14)),
+                                child: Text(
+                                  'Sort by Stock',
+                                  style: TextStyle(fontSize: 14),
+                                ),
                               ),
                             ],
                             onChanged: (value) => _changeSort(value!),
@@ -430,9 +425,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
             ),
           ),
 
-          Expanded(
-            child: _buildProductDisplay(),
-          ),
+          Expanded(child: _buildProductDisplay()),
         ],
       ),
     );
@@ -444,7 +437,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Colors.pink),
+            CircularProgressIndicator(color: Volt.ink),
             SizedBox(height: 16),
             Text('Loading inventory...'),
           ],
@@ -464,7 +457,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
             ElevatedButton(
               onPressed: _loadInitialData,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF5C6D3),
+                backgroundColor: Volt.soft,
                 foregroundColor: Colors.black87,
               ),
               child: const Text('Retry'),
@@ -480,7 +473,9 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              _searchController.text.isEmpty ? Icons.inventory_2_outlined : Icons.search_off,
+              _searchController.text.isEmpty
+                  ? Icons.inventory_2_outlined
+                  : Icons.search_off,
               size: 64,
               color: Colors.grey,
             ),
@@ -496,13 +491,16 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
       );
     }
 
-    return _viewMode == 'byBrand' ? _buildBrandGroupedView() : _buildAllProductsView();
+    return _viewMode == 'byBrand'
+        ? _buildBrandGroupedView()
+        : _buildAllProductsView();
   }
 
   Widget _buildBrandGroupedView() {
     return NotificationListener<ScrollNotification>(
       onNotification: (ScrollNotification scrollInfo) {
-        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent && _hasMore) {
+        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent &&
+            _hasMore) {
           _loadNextPage();
         }
         return false;
@@ -512,18 +510,25 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
         itemCount: _productsByBrand.length + (_isLoadingMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _productsByBrand.length && _isLoadingMore) {
-            return const Center(child: CircularProgressIndicator(color: Colors.pink));
+            return const Center(
+              child: CircularProgressIndicator(color: Volt.ink),
+            );
           }
 
           final brandId = _productsByBrand.keys.elementAt(index);
           final brandProducts = _productsByBrand[brandId]!;
           final brand = brandId != 'no_brand'
-              ? _brands.firstWhere((b) => b['id'] == brandId, orElse: () => {'name': 'Unknown Brand'})
+              ? _brands.firstWhere(
+                  (b) => b['id'] == brandId,
+                  orElse: () => {'name': 'Unknown Brand'},
+                )
               : {'name': 'No Brand'};
 
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             elevation: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,7 +538,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF5C6D3).withOpacity(0.3),
+                    color: Volt.soft.withValues(alpha: 0.3),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       topRight: Radius.circular(12),
@@ -541,7 +546,11 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.branding_watermark, size: 20, color: Colors.pink),
+                      const Icon(
+                        Icons.branding_watermark,
+                        size: 20,
+                        color: Volt.ink,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         brand['name'] as String,
@@ -568,11 +577,12 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                   physics: const NeverScrollableScrollPhysics(),
                   shrinkWrap: true,
                   padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.8,
+                    mainAxisExtent:
+                        310 * MediaQuery.textScalerOf(context).scale(1),
                   ),
                   itemCount: brandProducts.length,
                   itemBuilder: (context, productIndex) {
@@ -591,7 +601,8 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
   Widget _buildAllProductsView() {
     return NotificationListener<ScrollNotification>(
       onNotification: (ScrollNotification scrollInfo) {
-        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent && _hasMore) {
+        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent &&
+            _hasMore) {
           _loadNextPage();
         }
         return false;
@@ -615,10 +626,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                 if (_hasMore)
                   Text(
                     'Page ${_currentPage + 1}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
               ],
             ),
@@ -629,16 +637,18 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-                childAspectRatio: 0.75,
+                mainAxisExtent: 310 * MediaQuery.textScalerOf(context).scale(1),
               ),
               itemCount: _filteredProducts.length + (_isLoadingMore ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == _filteredProducts.length && _isLoadingMore) {
-                  return const Center(child: CircularProgressIndicator(color: Colors.pink));
+                  return const Center(
+                    child: CircularProgressIndicator(color: Volt.ink),
+                  );
                 }
 
                 final product = _filteredProducts[index];
@@ -653,10 +663,8 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
 
   Widget _buildProductCard(Map<String, dynamic> product) {
     final totalStock = product['total_stock'] ?? 0;
-    final branchStockMap = product['branch_stock_map'] as Map<String, int>? ?? {};
-    final jasaanStock = branchStockMap['JASAAN BRANCH'] ?? 0;
-    final puertoStock = branchStockMap['PUERTO BRANCH'] ?? 0;
-    final carmenStock = branchStockMap['CARMEN BRANCH'] ?? 0;
+    final branchStockMap =
+        product['branch_stock_map'] as Map<String, int>? ?? {};
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -682,10 +690,7 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                 ),
                 Text(
                   product['sku'] ?? 'No SKU',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                 ),
               ],
             ),
@@ -715,14 +720,18 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStockRow('Jasaan:', jasaanStock),
-                _buildStockRow('Puerto:', puertoStock),
-                _buildStockRow('Carmen:', carmenStock),
+                for (final branch in branchStockMap.entries.take(3))
+                  _buildStockRow(branch.key, branch.value),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: totalStock <= 30 ? Colors.orange.shade100 : Colors.green.shade100,
+                    color: totalStock <= 30
+                        ? Colors.orange.shade100
+                        : Colors.green.shade100,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -730,7 +739,9 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: totalStock <= 30 ? Colors.orange.shade800 : Colors.green.shade800,
+                      color: totalStock <= 30
+                          ? Colors.orange.shade800
+                          : Colors.green.shade800,
                     ),
                   ),
                 ),
@@ -746,9 +757,13 @@ class _AllProductsInventoryScreenState extends State<AllProductsInventoryScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          branchName,
-          style: const TextStyle(fontSize: 10, color: Colors.grey),
+        Expanded(
+          child: Text(
+            branchName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, color: Colors.grey),
+          ),
         ),
         Text(
           stock.toString(),

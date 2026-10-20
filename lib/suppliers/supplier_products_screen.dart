@@ -1,6 +1,7 @@
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 
 class SupplierProductsScreen extends StatefulWidget {
   final Map<String, dynamic> supplier;
@@ -21,7 +22,7 @@ class SupplierProductsScreen extends StatefulWidget {
 }
 
 class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
   List<Map<String, dynamic>> _supplierProducts = [];
   List<Map<String, dynamic>> _allProducts = [];
   bool _isLoading = true;
@@ -47,11 +48,13 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
           .order('name', ascending: true);
 
       setState(() {
-        _supplierProducts = List<Map<String, dynamic>>.from(supplierProductsData);
+        _supplierProducts = List<Map<String, dynamic>>.from(
+          supplierProductsData,
+        );
         _allProducts = List<Map<String, dynamic>>.from(allProductsData);
       });
     } catch (e) {
-      print('Error loading data: $e');
+      debugPrint('Error loading data: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -65,13 +68,14 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
       await _supabase
           .from('products')
           .update({
-        'supplier_id': widget.supplier['id'],
-        'supplier_price': price,
-      })
+            'supplier_id': widget.supplier['id'],
+            'supplier_price': price,
+          })
           .eq('id', productId);
 
       await _loadData();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Product assigned to supplier'),
@@ -80,6 +84,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -99,7 +104,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
           'Remove Product',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        content: const Text('Are you sure you want to remove this product from supplier?'),
+        content: const Text(
+          'Are you sure you want to remove this product from supplier?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -109,7 +116,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Remove', style: TextStyle(color: Colors.white)),
           ),
@@ -121,14 +130,12 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
       try {
         await _supabase
             .from('products')
-            .update({
-          'supplier_id': null,
-          'supplier_price': null,
-        })
+            .update({'supplier_id': null, 'supplier_price': null})
             .eq('id', productId);
 
         await _loadData();
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Product removed from supplier'),
@@ -137,6 +144,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
           ),
         );
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -148,7 +156,10 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
     }
   }
 
-  Future<void> _updateSupplierPrice(String productId, double currentPrice) async {
+  Future<void> _updateSupplierPrice(
+    String productId,
+    double currentPrice,
+  ) async {
     final price = await _showPriceDialog(initialPrice: currentPrice);
     if (price == null) return;
 
@@ -160,6 +171,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
 
       await _loadData();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Price updated successfully'),
@@ -168,6 +180,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -179,7 +192,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
   }
 
   Future<double?> _showPriceDialog({double? initialPrice}) async {
-    final controller = TextEditingController(text: initialPrice?.toString() ?? '');
+    final controller = TextEditingController(
+      text: initialPrice?.toString() ?? '',
+    );
 
     return await showDialog<double>(
       context: context,
@@ -210,7 +225,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFF5C6D3)),
+                    borderSide: const BorderSide(color: Volt.soft),
                   ),
                 ),
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
@@ -239,7 +254,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5C6D3),
+                        backgroundColor: Volt.soft,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -265,8 +280,11 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
 
   void _showAddProductDialog() {
     final availableProducts = _allProducts
-        .where((product) => product['supplier_id'] == null ||
-        product['supplier_id'] == widget.supplier['id'])
+        .where(
+          (product) =>
+              product['supplier_id'] == null ||
+              product['supplier_id'] == widget.supplier['id'],
+        )
         .toList();
 
     showDialog(
@@ -291,10 +309,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Select a product to assign to this supplier',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               Container(
@@ -307,9 +322,17 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search products...',
                     border: InputBorder.none,
-                    prefixIcon: const Icon(Icons.search, size: 20, color: Colors.grey),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      size: 20,
+                      color: Colors.grey,
+                    ),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
                       onPressed: () {},
                     ),
                   ),
@@ -322,92 +345,113 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
               Expanded(
                 child: availableProducts.isEmpty
                     ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.inventory, size: 60, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'All products are assigned',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-                    : ListView.builder(
-                  itemCount: availableProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = availableProducts[index];
-                    final alreadyAssigned = product['supplier_id'] == widget.supplier['id'];
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.grey.shade200,
-                        ),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: alreadyAssigned ? Colors.green.shade50 : Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            alreadyAssigned ? Icons.check_circle : Icons.inventory_2,
-                            color: alreadyAssigned ? Colors.green : Colors.grey,
-                            size: 20,
-                          ),
-                        ),
-                        title: Text(
-                          product['name'] ?? 'Unknown',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: alreadyAssigned ? Colors.green : Colors.black87,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '₱${(product['price'] ?? 0).toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        trailing: alreadyAssigned
-                            ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Assigned',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.inventory,
+                              size: 60,
+                              color: Colors.grey,
                             ),
-                          ),
-                        )
-                            : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                        onTap: alreadyAssigned
-                            ? null
-                            : () {
-                          Navigator.pop(context);
-                          _assignProductToSupplier(product['id']);
+                            const SizedBox(height: 16),
+                            const Text(
+                              'All products are assigned',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: availableProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = availableProducts[index];
+                          final alreadyAssigned =
+                              product['supplier_id'] == widget.supplier['id'];
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              leading: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: alreadyAssigned
+                                      ? Colors.green.shade50
+                                      : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  alreadyAssigned
+                                      ? Icons.check_circle
+                                      : Icons.inventory_2,
+                                  color: alreadyAssigned
+                                      ? Colors.green
+                                      : Colors.grey,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                product['name'] ?? 'Unknown',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: alreadyAssigned
+                                      ? Colors.green
+                                      : Colors.black87,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '₱${(product['price'] ?? 0).toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              trailing: alreadyAssigned
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'Assigned',
+                                        style: TextStyle(
+                                          color: Colors.green,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                              onTap: alreadyAssigned
+                                  ? null
+                                  : () {
+                                      Navigator.pop(context);
+                                      _assignProductToSupplier(product['id']);
+                                    },
+                            ),
+                          );
                         },
                       ),
-                    );
-                  },
-                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -441,7 +485,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -456,7 +500,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5C6D3),
+                  color: Volt.soft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -481,35 +525,31 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '${_supplierProducts.length} Products',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8EDF3),
+                  color: Volt.background,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.inventory,
-                      size: 14,
-                      color: Colors.pink[300],
-                    ),
+                    Icon(Icons.inventory, size: 14, color: Volt.ink),
                     const SizedBox(width: 4),
                     Text(
                       'Supplier',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: Colors.pink[300],
+                        color: Volt.ink,
                       ),
                     ),
                   ],
@@ -549,7 +589,11 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
     );
   }
 
-  Widget _buildInfoItem({required IconData icon, required String label, required String value}) {
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -559,11 +603,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: Colors.grey,
-          ),
+          Icon(icon, size: 16, color: Colors.grey),
           const SizedBox(width: 6),
           Text(
             '$label: ',
@@ -607,7 +647,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -622,14 +662,10 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.pink[50],
+                  color: Volt.soft,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  Icons.shopping_bag,
-                  color: Colors.pink[300],
-                  size: 20,
-                ),
+                child: Icon(Icons.shopping_bag, color: Volt.ink, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -674,7 +710,11 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                     value: 'remove',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 18, color: Colors.red[400]),
+                        Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red[400],
+                        ),
                         const SizedBox(width: 8),
                         const Text('Remove'),
                       ],
@@ -688,7 +728,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                     _removeProductFromSupplier(product['id']);
                   }
                 },
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ],
           ),
@@ -705,36 +747,24 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                 _buildPriceColumn(
                   label: 'Cost Price',
                   value: supplierPrice,
-                  color: Colors.pink[300]!,
+                  color: Volt.ink,
                   icon: Icons.price_change_outlined,
                 ),
-                Container(
-                  width: 1,
-                  height: 30,
-                  color: Colors.grey.shade300,
-                ),
+                Container(width: 1, height: 30, color: Colors.grey.shade300),
                 _buildPriceColumn(
                   label: 'Sale Price',
                   value: salePrice,
                   color: Colors.green,
                   icon: Icons.sell_outlined,
                 ),
-                Container(
-                  width: 1,
-                  height: 30,
-                  color: Colors.grey.shade300,
-                ),
+                Container(width: 1, height: 30, color: Colors.grey.shade300),
                 _buildPriceColumn(
                   label: 'Profit',
                   value: profit,
                   color: profitColor,
                   icon: Icons.trending_up_outlined,
                 ),
-                Container(
-                  width: 1,
-                  height: 30,
-                  color: Colors.grey.shade300,
-                ),
+                Container(width: 1, height: 30, color: Colors.grey.shade300),
                 _buildPriceColumn(
                   label: 'Margin',
                   value: margin,
@@ -754,10 +784,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                   const SizedBox(width: 6),
                   Text(
                     'Barcode: ${product['barcode']}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
@@ -794,7 +821,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          isPercent ? '${value.toStringAsFixed(1)}%' : '₱${value.toStringAsFixed(2)}',
+          isPercent
+              ? '${value.toStringAsFixed(1)}%'
+              : '₱${value.toStringAsFixed(2)}',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
@@ -808,9 +837,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5C6D3),
+        backgroundColor: Volt.background,
         elevation: 0,
         centerTitle: true,
         title: Text(
@@ -840,113 +869,53 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
       ),
       body: _isLoading
           ? const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFF5C6D3),
-          strokeWidth: 2,
-        ),
-      )
-          : Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSupplierInfoCard(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Products List',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    '${_supplierProducts.length} items',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: _supplierProducts.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.inventory_outlined,
-                      size: 40,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'No Products Assigned',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Add products to this supplier to get started',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _showAddProductDialog,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF5C6D3),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                    ),
-                    child: const Text(
-                      'Assign First Product',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+              child: CircularProgressIndicator(
+                color: Volt.soft,
+                strokeWidth: 2,
               ),
             )
-                : ListView.builder(
+          : ListView(
               padding: const EdgeInsets.only(bottom: 20),
-              itemCount: _supplierProducts.length,
-              itemBuilder: (context, index) => _buildProductItem(index),
+              children: [
+                _buildSupplierInfoCard(),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Products · ${_supplierProducts.length}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (_supplierProducts.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.inventory_2_outlined,
+                          size: 48,
+                          color: Volt.muted,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No products assigned',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _showAddProductDialog,
+                          child: const Text('Assign product'),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  for (var i = 0; i < _supplierProducts.length; i++)
+                    _buildProductItem(i),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

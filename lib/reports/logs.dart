@@ -1,15 +1,17 @@
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ActivityLogsPage extends StatefulWidget {
-  const ActivityLogsPage({Key? key, required List<Map<String, String>> logs}) : super(key: key);
+  const ActivityLogsPage({super.key, required List<Map<String, String>> logs});
 
   @override
   State<ActivityLogsPage> createState() => _ActivityLogsPageState();
 }
 
 class _ActivityLogsPageState extends State<ActivityLogsPage> {
-  final supabase = Supabase.instance.client;
+  final supabase = StoreConnection.client;
   List<Map<String, dynamic>> _logs = [];
   bool _isLoading = true;
 
@@ -24,14 +26,14 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     "Stock In",
     "Stock Out",
     "Updated",
-    "Low Stock"
+    "Low Stock",
   ];
 
   final List<String> _timeOptions = [
     "All Time",
     "Today",
     "This Week",
-    "This Month"
+    "This Month",
   ];
 
   @override
@@ -59,7 +61,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading logs: $e');
+      debugPrint('Error loading logs: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -118,7 +120,9 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     final salesLogs = <Map<String, dynamic>>[];
 
     for (final sale in sales) {
-      final saleItems = List<Map<String, dynamic>>.from(sale['sale_items'] ?? []);
+      final saleItems = List<Map<String, dynamic>>.from(
+        sale['sale_items'] ?? [],
+      );
 
       // Create one log entry per sold item
       for (final item in saleItems) {
@@ -247,7 +251,8 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
       filtered = filtered.where((log) {
         switch (_selectedActivity) {
           case "Sold":
-            return log['movement_type'] == 'sale' || log['movement_type'] == 'sale_completed';
+            return log['movement_type'] == 'sale' ||
+                log['movement_type'] == 'sale_completed';
           case "Stock In":
             return log['movement_type'] == 'stock_in';
           case "Stock Out":
@@ -289,34 +294,43 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
           // Header with Back Button
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 50, bottom: 20, left: 20, right: 20),
+            padding: const EdgeInsets.only(
+              top: 50,
+              bottom: 20,
+              left: 20,
+              right: 20,
+            ),
             decoration: BoxDecoration(
-              color: Color(0xFFF5C6D3),
+              color: Volt.soft,
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(20),
                 bottomRight: Radius.circular(20),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
-                )
+                ),
               ],
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 10),
                 // Logo matching inventory page - updated
                 const CircleAvatar(
                   radius: 25,
-                  backgroundImage: AssetImage("assets/logo.png"),
                   backgroundColor: Colors.white,
+                  child: Icon(Icons.bolt_rounded, color: Volt.ink),
                 ),
                 const Expanded(
                   child: Column(
@@ -333,16 +347,13 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
                       SizedBox(height: 3),
                       Text(
                         "System Activity History",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black54,
-                        ),
+                        style: TextStyle(fontSize: 16, color: Colors.black54),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
+                  icon: const Icon(Icons.refresh, color: Volt.ink, size: 28),
                   onPressed: _loadLogs,
                 ),
               ],
@@ -358,22 +369,34 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search),
                     hintText: "Search by user, product, branch, or action",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
                   onChanged: (value) => setState(() => _searchQuery = value),
                 ),
                 const SizedBox(height: 10),
-                Row(
+                ManagementColumns(
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedActivity,
-                        items: _activityOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (value) => setState(() { _selectedActivity = value!; _loadLogs(); }),
+                        isExpanded: true,
+                        initialValue: _selectedActivity,
+                        items: _activityOptions
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                        onChanged: (value) => setState(() {
+                          _selectedActivity = value!;
+                          _loadLogs();
+                        }),
                         decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           filled: true,
                           fillColor: Colors.white,
                         ),
@@ -382,11 +405,21 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedTime,
-                        items: _timeOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (value) => setState(() { _selectedTime = value!; _loadLogs(); }),
+                        isExpanded: true,
+                        initialValue: _selectedTime,
+                        items: _timeOptions
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                        onChanged: (value) => setState(() {
+                          _selectedTime = value!;
+                          _loadLogs();
+                        }),
                         decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           filled: true,
                           fillColor: Colors.white,
                         ),
@@ -403,43 +436,50 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredLogs.isEmpty
-                ? const Center(child: Text("No activity logs found", style: TextStyle(fontSize: 16, color: Colors.grey)))
+                ? const Center(
+                    child: Text(
+                      "No activity logs found",
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  )
                 : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SingleChildScrollView(
-                  child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(Colors.pink[100]),
-                    columns: const [
-                      DataColumn(label: Text('Time')),
-                      DataColumn(label: Text('User')),
-                      DataColumn(label: Text('Action')),
-                      DataColumn(label: Text('Description')),
-                      DataColumn(label: Text('Branch')),
-                    ],
-                    rows: _filteredLogs.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final log = entry.value;
-                      final createdAt = DateTime.parse(log['created_at']);
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                        child: DataTable(
+                          headingRowColor: WidgetStateProperty.all(Volt.soft),
+                          columns: const [
+                            DataColumn(label: Text('Time')),
+                            DataColumn(label: Text('User')),
+                            DataColumn(label: Text('Action')),
+                            DataColumn(label: Text('Description')),
+                            DataColumn(label: Text('Branch')),
+                          ],
+                          rows: _filteredLogs.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final log = entry.value;
+                            final createdAt = DateTime.parse(log['created_at']);
 
-                      return DataRow(
-                        color: MaterialStateProperty.resolveWith<Color?>(
-                              (Set<MaterialState> states) => index % 2 == 0 ? Colors.white : Colors.grey[100],
+                            return DataRow(
+                              color: WidgetStateProperty.resolveWith<Color?>(
+                                (Set<WidgetState> states) => index % 2 == 0
+                                    ? Colors.white
+                                    : Colors.grey[100],
+                              ),
+                              cells: [
+                                DataCell(Text(_formatTime(createdAt))),
+                                DataCell(Text(_getEmployeeName(log))),
+                                DataCell(Text(_getActionType(log))),
+                                DataCell(Text(_getActionDescription(log))),
+                                DataCell(Text(_getBranchName(log))),
+                              ],
+                            );
+                          }).toList(),
                         ),
-                        cells: [
-                          DataCell(Text(_formatTime(createdAt))),
-                          DataCell(Text(_getEmployeeName(log))),
-                          DataCell(Text(_getActionType(log))),
-                          DataCell(Text(_getActionDescription(log))),
-                          DataCell(Text(_getBranchName(log))),
-                        ],
-                      );
-                    }).toList(),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),

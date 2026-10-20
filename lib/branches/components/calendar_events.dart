@@ -1,5 +1,7 @@
+import '../calendar_repository.dart';
+
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CalendarEventDialog extends StatefulWidget {
   final DateTime selectedDate;
@@ -22,9 +24,9 @@ class CalendarEventDialog extends StatefulWidget {
 class _CalendarEventDialogState extends State<CalendarEventDialog> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final _repository = CalendarRepository();
   bool _isLoading = false;
-  List<dynamic> _existingEvents = [];
+  List<CalendarRecord> _existingEvents = [];
   String? _branchName;
 
   @override
@@ -34,36 +36,36 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
     _loadBranchName();
   }
 
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadBranchName() async {
     try {
-      final result = await _supabase
-          .from('branches')
-          .select('name')
-          .eq('id', widget.branchId)
-          .single();
-
+      final name = await _repository.branchName(widget.branchId);
+      if (!mounted) return;
       setState(() {
-        _branchName = result['name'] as String?;
+        _branchName = name;
       });
     } catch (e) {
-      print('Error loading branch name: $e');
+      debugPrint('Could not load branch name');
     }
   }
 
   Future<void> _loadExistingEvents() async {
     try {
-      final result = await _supabase
-          .from('calendar_events')
-          .select('*')
-          .eq('event_date', widget.selectedDate.toIso8601String().split('T')[0])
-          .eq('branch_id', widget.branchId)
-          .order('created_at');
-
+      final events = await _repository.forDay(
+        widget.branchId,
+        widget.selectedDate,
+      );
+      if (!mounted) return;
       setState(() {
-        _existingEvents = result;
+        _existingEvents = events;
       });
     } catch (e) {
-      print('Error loading existing events: $e');
+      debugPrint('Error loading existing events: $e');
     }
   }
 
@@ -75,13 +77,12 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
     });
 
     try {
-      await _supabase.from('calendar_events').insert({
-        'branch_id': widget.branchId,
-        'event_date': widget.selectedDate.toIso8601String().split('T')[0],
-        'event_type': 'custom',
-        'description': _descriptionController.text.trim(),
-        'created_by': widget.userId,
-      });
+      await _repository.add(
+        widget.branchId,
+        widget.selectedDate,
+        _descriptionController.text,
+        widget.userId,
+      );
 
       if (!mounted) return;
 
@@ -89,6 +90,7 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
       await _loadExistingEvents();
 
       // Notify parent to refresh calendar
+      if (!mounted) return;
       widget.onEventChanged();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,16 +123,14 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
     });
 
     try {
-      await _supabase
-          .from('calendar_events')
-          .delete()
-          .eq('id', eventId);
+      await _repository.remove(widget.branchId, eventId);
 
       if (!mounted) return;
 
       await _loadExistingEvents();
 
       // Notify parent to refresh calendar
+      if (!mounted) return;
       widget.onEventChanged();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -173,9 +173,7 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
               Navigator.pop(context);
               _removeEvent(eventId);
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Remove'),
           ),
         ],
@@ -197,18 +195,20 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.pink[50],
+                  color: Volt.soft,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const Icon(Icons.business, color: Colors.pink),
+                    const Icon(Icons.business, color: Volt.ink),
                     const SizedBox(width: 8),
                     Text(
                       'Branch: $_branchName',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.pink,
+                        color: Volt.ink,
                       ),
                     ),
                   ],
@@ -221,32 +221,33 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
             if (_existingEvents.isNotEmpty) ...[
               const Text(
                 'Existing Events:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 10),
-              ..._existingEvents.map((event) => Card(
-                color: Colors.grey[50],
-                child: ListTile(
-                  title: Text(
-                    event['description'] ?? 'No description',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    'Added by: ${event['created_by']}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: _isLoading ? null : () => _showDeleteConfirmation(
-                      event['id'],
-                      event['description'] ?? 'this event',
+              ..._existingEvents.map(
+                (event) => Card(
+                  color: Colors.grey[50],
+                  child: ListTile(
+                    title: Text(
+                      event.description,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      'Added by: ${event.createdBy}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: _isLoading
+                          ? null
+                          : () => _showDeleteConfirmation(
+                              event.id,
+                              event.description,
+                            ),
                     ),
                   ),
                 ),
-              )).toList(),
+              ),
               const Divider(),
               const SizedBox(height: 10),
             ],
@@ -254,10 +255,7 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
             // Add New Event Section
             const Text(
               'Add New Event:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 16),
 
@@ -267,7 +265,8 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
               decoration: const InputDecoration(
                 labelText: 'Event Description',
                 border: OutlineInputBorder(),
-                hintText: 'e.g., Shipment arriving, Product expiry, Meeting, etc.',
+                hintText:
+                    'e.g., Shipment arriving, Product expiry, Meeting, etc.',
               ),
               maxLines: 3,
               validator: (value) {
@@ -292,19 +291,20 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _addEvent,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.pink,
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: Volt.ink),
                     child: _isLoading
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
-                        : const Text('Add Event', style: TextStyle(color: Colors.white)),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Add Event',
+                            style: TextStyle(color: Colors.white),
+                          ),
                   ),
                 ),
               ],

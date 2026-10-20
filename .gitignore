@@ -34,6 +34,21 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Packaged applications and local database files
+*.apk
+*.aab
+*.ipa
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Local database tooling state
+/supabase/.temp/
+/supabase/.branches/
+
 # Symbolication related
 app.*.symbols
 
@@ -63,3 +78,7 @@ app.*.map.json
 # Operating-system files
 Thumbs.db
 Desktop.ini
+
+# JVM and Kotlin compiler output
+*.hprof
+.kotlin/

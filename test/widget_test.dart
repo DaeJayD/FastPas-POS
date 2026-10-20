@@ -15,41 +15,51 @@ class FailingCatalog extends SampleCatalog {
   }
 }
 
-Future<void> openHome(WidgetTester tester,
-    {CatalogSource? source,
-    Size size = const Size(390, 844),
-    double scale = 1}) async {
+Future<void> openHome(
+  WidgetTester tester, {
+  CatalogSource? source,
+  Size size = const Size(390, 844),
+  double scale = 1,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(MaterialApp(
-    theme: Volt.theme,
-    builder: (context, child) => MediaQuery(
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: Volt.theme,
+      builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context)
             .copyWith(textScaler: TextScaler.linear(scale)),
-        child: child!),
-    home: ProductHomeScreen(
+        child: child!,
+      ),
+      home: ProductHomeScreen(
         fullName: 'Alex Santos',
         role: 'owner',
         userId: 'preview',
         location: 'Main Branch',
-        source: source ?? SampleCatalog()),
-  ));
+        source: source ?? SampleCatalog(),
+      ),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
 Future<void> top(WidgetTester tester) async {
-  final scrollable =
-      tester.state<ScrollableState>(find.byType(Scrollable).first);
+  final scrollable = tester.state<ScrollableState>(
+    find.byType(Scrollable).first,
+  );
   scrollable.position.jumpTo(0);
   await tester.pumpAndSettle();
 }
 
 Future<void> add(WidgetTester tester, String id) async {
   final button = find.byKey(ValueKey('add-$id'));
-  await tester.scrollUntilVisible(button, 180,
-      scrollable: find.byType(Scrollable).first);
+  await tester.scrollUntilVisible(
+    button,
+    180,
+    scrollable: find.byType(Scrollable).first,
+  );
   await tester.ensureVisible(button);
   await tester.pumpAndSettle();
   await tester.tap(button);
@@ -57,10 +67,12 @@ Future<void> add(WidgetTester tester, String id) async {
 }
 
 void main() {
-  testWidgets('sign-in validates empty fields without accessing the backend',
-      (tester) async {
-    await tester
-        .pumpWidget(MaterialApp(theme: Volt.theme, home: const LoginScreen()));
+  testWidgets('sign-in validates empty fields without accessing the backend', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(theme: Volt.theme, home: const LoginScreen()),
+    );
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
@@ -69,13 +81,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('search and categories filter without losing the cart',
-      (tester) async {
+  testWidgets('search and categories filter without losing the cart', (
+    tester,
+  ) async {
     await openHome(tester);
     await add(tester, 'water');
     await top(tester);
     await tester.enterText(
-        find.byKey(const ValueKey('product-search')), 'ST-001');
+      find.byKey(const ValueKey('product-search')),
+      'ST-001',
+    );
     await tester.pumpAndSettle();
     expect(find.text('Ballpoint Pen'), findsOneWidget);
     expect(find.text('Bottled Water'), findsNothing);
@@ -93,8 +108,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('edited checkout quantities return to the same cart',
-      (tester) async {
+  testWidgets('edited checkout quantities return to the same cart', (
+    tester,
+  ) async {
     await openHome(tester);
     await add(tester, 'water');
     await add(tester, 'water');
@@ -115,64 +131,72 @@ void main() {
   });
 
   testWidgets(
-      'sample cash flow validates tender and produces a labeled receipt without Supabase',
-      (tester) async {
-    await openHome(tester);
-    await add(tester, 'water');
-    await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Continue to payment'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Preview receipt'));
-    await tester.pumpAndSettle();
-    expect(find.text('Please enter cash amount!'), findsOneWidget);
-    await tester.tap(find.text('Exact'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Preview receipt'));
-    await tester.pumpAndSettle();
-    expect(find.text('Your receipt preview'), findsOneWidget);
-    expect(find.text('Sample data only. No payment was recorded.'),
-        findsOneWidget);
-    expect(find.text('₱28.00'), findsWidgets);
-    await tester.tap(find.widgetWithText(FilledButton, 'Start a new sale'));
-    await tester.pumpAndSettle();
-    expect(find.text('Products'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Checkout'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+    'sample cash flow validates tender and produces a labeled receipt without Supabase',
+    (tester) async {
+      await openHome(tester);
+      await add(tester, 'water');
+      await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Continue to payment'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Preview receipt'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please enter cash amount!'), findsOneWidget);
+      await tester.tap(find.text('Exact'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Preview receipt'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your receipt preview'), findsOneWidget);
+      expect(
+        find.text('Sample data only. No payment was recorded.'),
+        findsOneWidget,
+      );
+      expect(find.text('₱28.00'), findsWidgets);
+      await tester.tap(find.widgetWithText(FilledButton, 'Start a new sale'));
+      await tester.pumpAndSettle();
+      expect(find.text('Products'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Checkout'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
-      'stock limit disables increment and branch changes require cart confirmation',
-      (tester) async {
-    await openHome(tester);
-    for (var i = 0; i < 4; i++) {
-      await add(tester, 'tissue');
-    }
-    final plus =
-        tester.widget<IconButton>(find.byKey(const ValueKey('add-tissue')));
-    expect(plus.onPressed, isNull);
-    await top(tester);
-    await tester.ensureVisible(find.text('Main Branch'));
-    await tester.tap(find.text('Main Branch'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('North Branch'));
-    await tester.pumpAndSettle();
-    expect(find.text('Switch branch?'), findsOneWidget);
-    await tester.tap(find.text('Keep cart'));
-    await tester.pumpAndSettle();
-    expect(find.text('₱80.00'), findsWidgets);
-    await tester.tap(find.text('Main Branch'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('North Branch'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Switch branch'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, 'Checkout'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+    'stock limit disables increment and branch changes require cart confirmation',
+    (tester) async {
+      await openHome(tester);
+      for (var i = 0; i < 4; i++) {
+        await add(tester, 'tissue');
+      }
+      final plus = tester.widget<IconButton>(
+        find.byKey(const ValueKey('add-tissue')),
+      );
+      expect(plus.onPressed, isNull);
+      await top(tester);
+      await tester.ensureVisible(find.text('Main Branch'));
+      await tester.tap(find.text('Main Branch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('North Branch'));
+      await tester.pumpAndSettle();
+      expect(find.text('Switch branch?'), findsOneWidget);
+      await tester.tap(find.text('Keep cart'));
+      await tester.pumpAndSettle();
+      expect(find.text('₱80.00'), findsWidgets);
+      await tester.tap(find.text('Main Branch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('North Branch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Switch branch'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, 'Checkout'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('failed catalog can be retried and empty search can be cleared',
-      (tester) async {
+  testWidgets('failed catalog can be retried and empty search can be cleared', (
+    tester,
+  ) async {
     final source = FailingCatalog();
     await openHome(tester, source: source);
     expect(find.text('Couldn’t load your catalog'), findsOneWidget);
@@ -181,7 +205,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Bottled Water'), findsOneWidget);
     await tester.enterText(
-        find.byKey(const ValueKey('product-search')), 'not-a-product');
+      find.byKey(const ValueKey('product-search')),
+      'not-a-product',
+    );
     await tester.pumpAndSettle();
     expect(find.text('No matching products'), findsOneWidget);
     await tester.tap(find.text('Clear filters'));
@@ -191,19 +217,21 @@ void main() {
   });
 
   for (final size in [const Size(360, 800), const Size(1024, 768)]) {
-    testWidgets('catalog and cart fit ${size.width.toInt()}px with larger text',
-        (tester) async {
-      await openHome(tester, size: size, scale: 1.3);
-      await add(tester, 'water');
-      await add(tester, 'cookies');
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.text('Inventory').last);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.text('More').last);
-      await tester.pumpAndSettle();
-      expect(find.text('Your store'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'catalog and cart fit ${size.width.toInt()}px with larger text',
+      (tester) async {
+        await openHome(tester, size: size, scale: 1.3);
+        await add(tester, 'water');
+        await add(tester, 'cookies');
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Inventory').last);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('More').last);
+        await tester.pumpAndSettle();
+        expect(find.text('Your store'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 }

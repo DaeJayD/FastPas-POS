@@ -34,8 +34,11 @@ abstract final class Volt {
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
         elevation: 0,
-        titleTextStyle:
-            TextStyle(color: ink, fontSize: 20, fontWeight: FontWeight.w700),
+        titleTextStyle: TextStyle(
+          color: ink,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
@@ -52,9 +55,12 @@ abstract final class Volt {
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
-            borderSide: const BorderSide(color: ink, width: 1.5)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          borderSide: const BorderSide(color: ink, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
         hintStyle: const TextStyle(color: muted),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -63,8 +69,9 @@ abstract final class Volt {
           foregroundColor: ink,
           minimumSize: const Size(48, 52),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -73,21 +80,24 @@ abstract final class Volt {
           foregroundColor: Colors.white,
           minimumSize: const Size(48, 48),
           elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         indicatorColor: lime.withValues(alpha: .24),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
-              color: states.contains(WidgetState.selected) ? ink : muted,
-              fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w700
-                  : FontWeight.w500,
-              fontSize: 12,
-            )),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            color: states.contains(WidgetState.selected) ? ink : muted,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w500,
+            fontSize: 12,
+          ),
+        ),
       ),
       dividerTheme: const DividerThemeData(color: line, thickness: 1),
       snackBarTheme: SnackBarThemeData(
@@ -104,29 +114,44 @@ class FastPasBrand extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: size * 1.15,
-            height: size,
-            child: CustomPaint(painter: _SpeedMark()),
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: size * 1.15,
+          height: size,
+          child: CustomPaint(painter: _SpeedMark()),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          'FastPas',
+          style: TextStyle(
+            fontSize: size,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1.2,
+            color: Volt.ink,
           ),
-          const SizedBox(width: 10),
-          Text('FastPas',
-              style: TextStyle(
-                  fontSize: size,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.2,
-                  color: Volt.ink)),
-          const SizedBox(width: 6),
-          Text('POS',
-              style: TextStyle(
-                  fontSize: size * .47,
-                  fontWeight: FontWeight.w700,
-                  color: Volt.muted)),
-        ],
-      );
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'POS',
+          style: TextStyle(
+            fontSize: size * .47,
+            fontWeight: FontWeight.w700,
+            color: Volt.muted,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class FastPasMark extends StatelessWidget {
+  const FastPasMark({super.key});
+  @override
+  Widget build(BuildContext context) => CustomPaint(painter: _SpeedMark());
 }
 
 class _SpeedMark extends CustomPainter {

@@ -1,15 +1,15 @@
+import '../branches/branch_repository.dart';
+import '../branches/branch_screen.dart';
+import '../catalog/catalog_source.dart';
+
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vasenizzpos/branches/jasaan_branch.dart';
-import 'package:vasenizzpos/branches/puerto_branch.dart';
 import 'package:vasenizzpos/inventory/inventory_history.dart';
 import 'package:vasenizzpos/products/allproducts_screen.dart';
-import 'package:vasenizzpos/dashboard/home_screen.dart';
-import 'package:vasenizzpos/sales/sales_screen.dart';
-import 'package:vasenizzpos/reports/reports_page.dart';
-import 'package:vasenizzpos/users/users_page.dart';
-import 'package:vasenizzpos/branches/carmen_branch.dart';
 import 'package:vasenizzpos/suppliers/suppliers_creen.dart';
 
 class InventoryPage extends StatefulWidget {
@@ -33,10 +33,9 @@ class InventoryPage extends StatefulWidget {
 }
 
 class _InventoryScreenPageState extends State<InventoryPage> {
-  late int _selectedIndex;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
 
   List<dynamic> _lowStockItems = [];
   List<dynamic> _calendarEvents = [];
@@ -45,7 +44,6 @@ class _InventoryScreenPageState extends State<InventoryPage> {
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.initialIndex;
     _initializeData();
   }
 
@@ -103,9 +101,7 @@ class _InventoryScreenPageState extends State<InventoryPage> {
   Future<void> _loadAllBranchesLowStock() async {
     try {
       // Get low stock items from all branches
-      final stockResult = await _supabase
-          .from('branch_stock')
-          .select('''
+      final stockResult = await _supabase.from('branch_stock').select('''
             *,
             products(
               name,
@@ -151,193 +147,61 @@ class _InventoryScreenPageState extends State<InventoryPage> {
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
-  void _showBranchSelector(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: Colors.white,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "SELECT BRANCH",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.pink,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              _branchButton(
-                context,
-                icon: Icons.home,
-                label: "CARMEN BRANCH",
-                color: Colors.pink[300]!,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context, MaterialPageRoute(
-                      builder: (context) => CarmenScreen(
-                        fullName: widget.fullName,
-                        role: widget.role,
-                        userId: widget.userId,
-                        location: widget.location,)
+  Future<void> _showBranchSelector(BuildContext context) async {
+    try {
+      final branches = await BranchRepository().branches();
+      if (!context.mounted) return;
+      final branch = await showDialog<StoreBranch>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Select branch'),
+          content: SizedBox(
+            width: 420,
+            height: 300,
+            child: branches.isEmpty
+                ? const Center(child: Text('No branches found'))
+                : ListView(
+                    children: [
+                      for (final branch in branches)
+                        ListTile(
+                          leading: const Icon(Icons.storefront_outlined),
+                          title: Text(branch.name),
+                          onTap: () => Navigator.pop(context, branch),
+                        ),
+                    ],
                   ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 10),
-
-              _branchButton(
-                context,
-                icon: Icons.home,
-                label: "PUERTO BRANCH",
-                color: Colors.pink[200]!,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PuertoScreen(
-                        fullName: widget.fullName,
-                        role: widget.role,
-                        userId: widget.userId,
-                        location: widget.location,
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 10),
-
-              _branchButton(
-                context,
-                icon: Icons.home,
-                label: "JASAAN BRANCH",
-                color: Colors.pink[100]!,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => JasaanScreen(
-                        fullName: widget.fullName,
-                        role: widget.role,
-                        userId: widget.userId,
-                        location: widget.location,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+      if (branch == null || !context.mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BranchScreen(
+            fullName: widget.fullName,
+            role: widget.role,
+            userId: widget.userId,
+            location: branch.location,
+            branchName: branch.name,
+            branch: branch,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _branchButton(
-      BuildContext context, {
-        required IconData icon,
-        required String label,
-        required Color color,
-        required VoidCallback onTap,
-      }) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, color: Colors.white),
-      label: Text(label,
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        minimumSize: const Size(double.infinity, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
-
-    Widget nextPage;
-    switch (index) {
-      case 0:
-        nextPage = HomeScreen(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-          initialIndex: 0,
-        );
-        break;
-
-      case 1:
-        nextPage = SalesScreen(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-          initialIndex: 1,
-        );
-        break;
-
-      case 2:
-        nextPage = InventoryPage(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-          initialIndex: 2,
-        );
-        break;
-
-      case 3:
-        nextPage = ViewReportsPage(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-
-          initialIndex: 3,
-        );
-        break;
-
-      case 4:
-        nextPage = UsersPage(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-          initialIndex: 4,
-        );
-        break;
-
-      default:
-        return;
+      );
+    } catch (_) {
+      if (mounted) {
+        _showErrorSnackbar('Could not load branches. Please try again.');
+      }
     }
-
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, a, b) => nextPage,
-        transitionDuration: Duration.zero,
-      ),
-    );
   }
 
   Widget _buildLowStockAlert() {
@@ -364,7 +228,8 @@ class _InventoryScreenPageState extends State<InventoryPage> {
     if (hasLowStock) {
       lowStockProductNames = productNames.join('\n');
       if (productNames.length < _lowStockItems.length) {
-        lowStockProductNames += '\n+ ${_lowStockItems.length - productNames.length} more';
+        lowStockProductNames +=
+            '\n+ ${_lowStockItems.length - productNames.length} more';
       }
     }
 
@@ -373,9 +238,7 @@ class _InventoryScreenPageState extends State<InventoryPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4)
-        ],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
       child: Column(
         children: [
@@ -388,11 +251,7 @@ class _InventoryScreenPageState extends State<InventoryPage> {
             ),
           ),
           const SizedBox(height: 10),
-          Icon(
-            Icons.inventory_rounded,
-            color: alertColor,
-            size: 40,
-          ),
+          Icon(Icons.inventory_rounded, color: alertColor, size: 40),
           const SizedBox(height: 5),
           Text(
             "${_lowStockItems.length}",
@@ -451,19 +310,22 @@ class _InventoryScreenPageState extends State<InventoryPage> {
         headerStyle: const HeaderStyle(
           formatButtonVisible: false,
           titleCentered: true,
-          titleTextStyle: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink),
+          titleTextStyle: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Volt.ink,
+          ),
         ),
         calendarStyle: CalendarStyle(
           todayDecoration: BoxDecoration(
-            color: Colors.pink.shade200,
+            color: Volt.ink,
             shape: BoxShape.circle,
           ),
           selectedDecoration: BoxDecoration(
-            color: Colors.pink.shade400,
+            color: Volt.ink,
             shape: BoxShape.circle,
           ),
           markerDecoration: BoxDecoration(
-            color: Colors.pink,
+            color: Volt.ink,
             shape: BoxShape.circle,
           ),
           markersAlignment: Alignment.bottomCenter,
@@ -476,140 +338,129 @@ class _InventoryScreenPageState extends State<InventoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5C6D3),
-        elevation: 0,
-        title: Row(
-          children: [
-            const CircleAvatar(
-              radius: 24,
-              backgroundImage: AssetImage("assets/logo.png"),
-              backgroundColor: Colors.white,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("All Branches Inventory",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.black87)),
-                Text("${widget.fullName} (${widget.role})",
-                    style: const TextStyle(fontSize: 13, color: Colors.black54)),
-              ],
-            ),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.notifications_none_rounded,
-                  color: Colors.white, size: 26),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _initializeData,
-            ),
-          ],
+        title: ManagementTitle(
+          'Branches & stock',
+          subtitle: '${widget.fullName} · ${widget.role}',
         ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.pink))
-          : Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      _actionButton("Branch Inventory", Icons.inventory_2_outlined,
-                          Color(0xFFD1828B), onPressed: () => _showBranchSelector(context)),
-                      const SizedBox(height: 10),
-                      _actionButton("Inventory History", Icons.history,
-                          Color(0xFFD1828B), onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => InventoryHistoryScreen(
-                                  fullName: widget.fullName,
-                                  role: widget.role,
-                                  userId: widget.userId,
-                                ),
-                              ),
-                            );
-                          }),
-                      const SizedBox(height: 10),
-                      _actionButton("View All Products", Icons.list_alt,
-                          Color(0xFFD1828B), onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AllProductsInventoryScreen(
-                                  fullName: widget.fullName,
-                                  role: widget.role,
-                                ),
-                              ),
-                            );
-                          }),
-                      const SizedBox(height: 10),
-                      _actionButton("Suppliers", Icons.local_shipping,
-                          Color(0xFFD1828B), onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SuppliersScreen(
-                                  fullName: widget.fullName,
-                                  role: widget.role,
-                                  userId: widget.userId,
-                                ),
-                              ),
-                            );
-                          }),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: _buildLowStockAlert(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: _buildCalendar(),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.black54,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: "Dashboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Sales"),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory), label: "Inventory"),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Report"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _initializeData();
+            },
+          ),
         ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Volt.ink))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  ManagementColumns(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            _actionButton(
+                              "Branch Inventory",
+                              Icons.inventory_2_outlined,
+                              Volt.ink,
+                              onPressed: () => _showBranchSelector(context),
+                            ),
+                            const SizedBox(height: 10),
+                            _actionButton(
+                              "Inventory History",
+                              Icons.history,
+                              Volt.ink,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        InventoryHistoryScreen(
+                                          fullName: widget.fullName,
+                                          role: widget.role,
+                                          userId: widget.userId,
+                                        ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _actionButton(
+                              "View All Products",
+                              Icons.list_alt,
+                              Volt.ink,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        AllProductsInventoryScreen(
+                                          fullName: widget.fullName,
+                                          role: widget.role,
+                                        ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _actionButton(
+                              "Suppliers",
+                              Icons.local_shipping,
+                              Volt.ink,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => SuppliersScreen(
+                                      fullName: widget.fullName,
+                                      role: widget.role,
+                                      userId: widget.userId,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(flex: 2, child: _buildLowStockAlert()),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(height: 480, child: _buildCalendar()),
+                ],
+              ),
+            ),
+      bottomNavigationBar: null,
     );
   }
-  Widget _actionButton(String label, IconData icon, Color color,
-      {VoidCallback? onPressed}) {
+
+  Widget _actionButton(
+    String label,
+    IconData icon,
+    Color color, {
+    VoidCallback? onPressed,
+  }) {
     return ElevatedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, color: Colors.white),
-      label: Text(label,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      label: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         minimumSize: const Size(double.infinity, 70),
@@ -642,7 +493,7 @@ class AddEventForm extends StatefulWidget {
 class _AddEventFormState extends State<AddEventForm> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
   bool _isLoading = false;
   String? _selectedBranchId;
   List<Map<String, dynamic>> _branches = [];
@@ -669,7 +520,7 @@ class _AddEventFormState extends State<AddEventForm> {
         }
       });
     } catch (e) {
-      print('Error loading branches: $e');
+      debugPrint('Error loading branches: $e');
     }
   }
 
@@ -685,7 +536,7 @@ class _AddEventFormState extends State<AddEventForm> {
         _existingEvents = result;
       });
     } catch (e) {
-      print('Error loading existing events: $e');
+      debugPrint('Error loading existing events: $e');
     }
   }
 
@@ -750,10 +601,7 @@ class _AddEventFormState extends State<AddEventForm> {
     });
 
     try {
-      await _supabase
-          .from('calendar_events')
-          .delete()
-          .eq('id', eventId);
+      await _supabase.from('calendar_events').delete().eq('id', eventId);
 
       if (!mounted) return;
 
@@ -761,6 +609,7 @@ class _AddEventFormState extends State<AddEventForm> {
       await _loadExistingEvents();
       widget.onEventRemoved();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Event removed successfully!'),
@@ -801,9 +650,7 @@ class _AddEventFormState extends State<AddEventForm> {
               Navigator.pop(context);
               _removeEvent(eventId);
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Remove'),
           ),
         ],
@@ -824,32 +671,33 @@ class _AddEventFormState extends State<AddEventForm> {
             if (_existingEvents.isNotEmpty) ...[
               const Text(
                 'Existing Events:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 10),
-              ..._existingEvents.map((event) => Card(
-                color: Colors.grey[50],
-                child: ListTile(
-                  title: Text(
-                    event['description'] ?? 'No description',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    'Branch: ${_getBranchName(event['branch_id'])}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: _isLoading ? null : () => _showDeleteConfirmation(
-                      event['id'],
-                      event['description'] ?? 'this event',
+              ..._existingEvents.map(
+                (event) => Card(
+                  color: Colors.grey[50],
+                  child: ListTile(
+                    title: Text(
+                      event['description'] ?? 'No description',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      'Branch: ${_getBranchName(event['branch_id'])}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: _isLoading
+                          ? null
+                          : () => _showDeleteConfirmation(
+                              event['id'],
+                              event['description'] ?? 'this event',
+                            ),
                     ),
                   ),
                 ),
-              )).toList(),
+              ),
               const Divider(),
               const SizedBox(height: 10),
             ],
@@ -857,17 +705,14 @@ class _AddEventFormState extends State<AddEventForm> {
             // Add New Event Section
             const Text(
               'Add New Event:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 16),
 
             // Branch Selection Dropdown
             if (_branches.isNotEmpty) ...[
               DropdownButtonFormField<String>(
-                value: _selectedBranchId,
+                initialValue: _selectedBranchId,
                 decoration: const InputDecoration(
                   labelText: 'Select Branch',
                   border: OutlineInputBorder(),
@@ -899,7 +744,8 @@ class _AddEventFormState extends State<AddEventForm> {
               decoration: const InputDecoration(
                 labelText: 'Event Description',
                 border: OutlineInputBorder(),
-                hintText: 'e.g., Shipment arriving, Product expiry, Meeting, etc.',
+                hintText:
+                    'e.g., Shipment arriving, Product expiry, Meeting, etc.',
               ),
               maxLines: 3,
               validator: (value) {
@@ -924,19 +770,20 @@ class _AddEventFormState extends State<AddEventForm> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _addEvent,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.pink,
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: Volt.ink),
                     child: _isLoading
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
-                        : const Text('Add Event', style: TextStyle(color: Colors.white)),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Add Event',
+                            style: TextStyle(color: Colors.white),
+                          ),
                   ),
                 ),
               ],
@@ -950,7 +797,7 @@ class _AddEventFormState extends State<AddEventForm> {
   String _getBranchName(String? branchId) {
     if (branchId == null) return 'All Branches';
     final branch = _branches.firstWhere(
-          (b) => b['id'] == branchId,
+      (b) => b['id'] == branchId,
       orElse: () => {'name': 'Unknown Branch'},
     );
     return branch['name'] as String;

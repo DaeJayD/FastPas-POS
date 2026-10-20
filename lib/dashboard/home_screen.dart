@@ -1,9 +1,10 @@
+import '../inventory/inventory_screen.dart';
+import '../sales/sales_history_page.dart';
+
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vasenizzpos/inventory/inventory_screen.dart';
-import 'package:vasenizzpos/sales/sales_screen.dart';
-import 'package:vasenizzpos/reports/reports_page.dart';
-import 'package:vasenizzpos/users/users_page.dart';
 
 class HomeScreen extends StatefulWidget {
   final String fullName;
@@ -18,15 +19,14 @@ class HomeScreen extends StatefulWidget {
     required this.location,
     required this.userId,
     this.initialIndex = 0,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late int _selectedIndex;
   Map<String, dynamic> _salesData = {
     'itemsSoldToday': 0,
     'totalSalesToday': 0.0,
@@ -43,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.initialIndex;
     _loadDashboardData();
     _loadLowStockProducts();
     _loadRecentAttendance();
@@ -51,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadRecentAttendance() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await StoreConnection.client
           .from('attendance')
           .select('''
           time_in,
@@ -72,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingAttendance = false;
       });
     } catch (e) {
-      print('Error loading recent attendance: $e');
+      debugPrint('Error loading recent attendance: $e');
       setState(() {
         _isLoadingAttendance = false;
       });
@@ -81,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadLowStockProducts() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await StoreConnection.client
           .from('branch_stock')
           .select('''
             current_stock,
@@ -103,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoadingLowStock = false;
       });
     } catch (e) {
-      print('Error loading low stock products: $e');
+      debugPrint('Error loading low stock products: $e');
       setState(() {
         _isLoadingLowStock = false;
       });
@@ -118,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final yesterdayEnd = todayStart.subtract(const Duration(seconds: 1));
 
       // Get today's sales from ALL branches (remove branch filtering)
-      final todaySalesResponse = await Supabase.instance.client
+      final todaySalesResponse = await StoreConnection.client
           .from('sales')
           .select('*')
           .gte('created_at', todayStart.toIso8601String());
@@ -126,17 +125,19 @@ class _HomeScreenState extends State<HomeScreen> {
       final todaySales = List<Map<String, dynamic>>.from(todaySalesResponse);
 
       // Get yesterday's sales from ALL branches for comparison
-      final yesterdaySalesResponse = await Supabase.instance.client
+      final yesterdaySalesResponse = await StoreConnection.client
           .from('sales')
           .select('*')
           .gte('created_at', yesterdayStart.toIso8601String())
           .lte('created_at', yesterdayEnd.toIso8601String());
 
-      final yesterdaySales = List<Map<String, dynamic>>.from(yesterdaySalesResponse);
+      final yesterdaySales = List<Map<String, dynamic>>.from(
+        yesterdaySalesResponse,
+      );
 
       // Get top selling products from ALL branches (last 7 days)
       final weekAgo = today.subtract(const Duration(days: 7));
-      final topSellingResponse = await Supabase.instance.client
+      final topSellingResponse = await StoreConnection.client
           .from('sale_items')
           .select('''
           product_id,
@@ -145,7 +146,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ''')
           .gte('created_at', weekAgo.toIso8601String());
 
-      final topSellingItems = List<Map<String, dynamic>>.from(topSellingResponse);
+      final topSellingItems = List<Map<String, dynamic>>.from(
+        topSellingResponse,
+      );
 
       // Calculate totals from ALL branches
       int itemsSoldToday = 0;
@@ -157,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
         totalSalesToday += (sale['total_amount'] ?? 0).toDouble();
 
         // Get sale items for this sale to count quantities
-        final saleItemsResponse = await Supabase.instance.client
+        final saleItemsResponse = await StoreConnection.client
             .from('sale_items')
             .select('quantity')
             .eq('sale_id', sale['id']);
@@ -195,7 +198,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Convert to list and sort by quantity
       final topSellingList = productSales.values.toList();
-      topSellingList.sort((a, b) => (b['quantity'] ?? 0).compareTo(a['quantity'] ?? 0));
+      topSellingList.sort(
+        (a, b) => (b['quantity'] ?? 0).compareTo(a['quantity'] ?? 0),
+      );
 
       setState(() {
         _salesData = {
@@ -207,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading dashboard data: $e');
+      debugPrint('Error loading dashboard data: $e');
       setState(() {
         _isLoading = false;
       });
@@ -232,69 +237,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return today >= yesterday ? Colors.green : Colors.red;
   }
 
-  void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
-
-    setState(() => _selectedIndex = index);
-
-    Widget nextPage;
-    switch (index) {
-      case 0:
-        nextPage = HomeScreen(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-          initialIndex: 0,
-        );
-        break;
-      case 1:
-        nextPage = SalesScreen(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-        );
-        break;
-      case 2:
-        nextPage = InventoryPage(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-        );
-        break;
-      case 3:
-        nextPage = ViewReportsPage(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-        );
-        break;
-      case 4:
-        nextPage = UsersPage(
-          fullName: widget.fullName,
-          role: widget.role,
-          userId: widget.userId,
-          location: widget.location,
-          initialIndex: 4,
-        );
-        break;
-      default:
-        return;
-    }
-
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation1, animation2) => nextPage,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-      ),
-    );
-  }
-
   void _toggleLowStockList() {
     setState(() {
       _showLowStockList = !_showLowStockList;
@@ -302,8 +244,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLowStockSummary() {
-    final outOfStockCount = _lowStockProducts.where((item) => (item['current_stock'] ?? 0) == 0).length;
-    final runningLowCount = _lowStockProducts.where((item) => (item['current_stock'] ?? 0) > 0 && (item['current_stock'] ?? 0) <= 5).length;
+    final outOfStockCount = _lowStockProducts
+        .where((item) => (item['current_stock'] ?? 0) == 0)
+        .length;
+    final runningLowCount = _lowStockProducts
+        .where(
+          (item) =>
+              (item['current_stock'] ?? 0) > 0 &&
+              (item['current_stock'] ?? 0) <= 5,
+        )
+        .length;
     final totalLowStock = outOfStockCount + runningLowCount;
 
     return Column(
@@ -316,7 +266,9 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 3)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 3),
+              ],
               border: Border.all(
                 color: totalLowStock > 0 ? Colors.orange : Colors.green,
                 width: 1.5,
@@ -339,7 +291,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: totalLowStock > 0 ? Colors.orange : Colors.green,
+                          color: totalLowStock > 0
+                              ? Colors.orange
+                              : Colors.green,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -352,11 +306,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       if (totalLowStock > 0) ...[
                         const SizedBox(height: 4),
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            _buildStockIndicator('Out of Stock', outOfStockCount, Colors.red),
+                            _buildStockIndicator(
+                              'Out of Stock',
+                              outOfStockCount,
+                              Colors.red,
+                            ),
                             const SizedBox(width: 8),
-                            _buildStockIndicator('Running Low', runningLowCount, Colors.orange),
+                            _buildStockIndicator(
+                              'Running Low',
+                              runningLowCount,
+                              Colors.orange,
+                            ),
                           ],
                         ),
                       ],
@@ -371,7 +335,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-
         if (_showLowStockList && totalLowStock > 0) ...[
           const SizedBox(height: 12),
           Container(
@@ -383,7 +346,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Column(
               children: [
-                ..._lowStockProducts.take(10).map((product) => _buildLowStockItem(product)).toList(),
+                ..._lowStockProducts
+                    .take(10)
+                    .map((product) => _buildLowStockItem(product)),
                 if (_lowStockProducts.length > 10)
                   Text(
                     '+ ${_lowStockProducts.length - 10} more items...',
@@ -395,11 +360,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 const SizedBox(height: 8),
                 ElevatedButton(
-                  onPressed: () => _onItemTapped(2), // Navigate to Inventory
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => InventoryPage(
+                        fullName: widget.fullName,
+                        role: widget.role,
+                        userId: widget.userId,
+                        location: widget.location,
+                      ),
+                    ),
+                  ), // Navigate to Inventory
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
                   ),
                   child: const Text('View All in Inventory'),
                 ),
@@ -415,9 +393,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -425,10 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 4),
           Text(
@@ -447,7 +422,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLowStockItem(Map<String, dynamic> product) {
     final currentStock = product['current_stock'] ?? 0;
     final productName = product['products']?['name'] ?? 'Unknown Product';
-    final category = product['products']?['categories']?['name'] ?? 'Uncategorized';
+    final category =
+        product['products']?['categories']?['name'] ?? 'Uncategorized';
     final isOutOfStock = currentStock == 0;
 
     return Container(
@@ -457,7 +433,9 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isOutOfStock ? Colors.red.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+          color: isOutOfStock
+              ? Colors.red.withValues(alpha: 0.3)
+              : Colors.orange.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -483,10 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Text(
                   category,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                 ),
               ],
             ),
@@ -494,7 +469,9 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: isOutOfStock ? Colors.red.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+              color: isOutOfStock
+                  ? Colors.red.withValues(alpha: 0.1)
+                  : Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -524,16 +501,14 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.access_time, color: Colors.pink.shade400, size: 20),
+              Icon(Icons.access_time, color: Volt.ink, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                "Recent Attendance",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              const Expanded(
+                child: Text(
+                  "Recent Attendance",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
-              const Spacer(),
               IconButton(
                 icon: Icon(Icons.refresh, size: 18, color: Colors.grey),
                 onPressed: _loadRecentAttendance,
@@ -547,12 +522,17 @@ class _HomeScreenState extends State<HomeScreen> {
             const Center(
               child: Text(
                 'No attendance records',
-                style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             )
           else
             Column(
-              children: _recentAttendance.map((attendance) => _buildAttendanceItem(attendance)).toList(), // Removed .take(5)
+              children: _recentAttendance
+                  .map((attendance) => _buildAttendanceItem(attendance))
+                  .toList(), // Removed .take(5)
             ),
         ],
       ),
@@ -564,8 +544,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final userName = employee['name'] ?? 'Unknown User';
     final branch = employee['branch'] ?? 'Unknown Branch';
     final role = employee['role'] ?? '';
-    final timeIn = attendance['time_in'] != null ? DateTime.parse(attendance['time_in']) : null;
-    final timeOut = attendance['time_out'] != null ? DateTime.parse(attendance['time_out']) : null;
+    final timeIn = attendance['time_in'] != null
+        ? DateTime.parse(attendance['time_in'])
+        : null;
+    final timeOut = attendance['time_out'] != null
+        ? DateTime.parse(attendance['time_out'])
+        : null;
     final date = attendance['date'] ?? '';
 
     final isClockedIn = timeOut == null;
@@ -611,10 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 2),
                 Text(
                   date,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
               ],
             ),
@@ -625,18 +606,27 @@ class _HomeScreenState extends State<HomeScreen> {
               if (timeIn != null)
                 Text(
                   'In: ${timeIn.hour}:${timeIn.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               if (timeOut != null)
                 Text(
                   'Out: ${timeOut.hour}:${timeOut.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               if (isClockedIn)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
@@ -658,47 +648,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFFF5C6D3),
-        elevation: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundImage: const AssetImage('assets/logo.png'),
-              radius: 22,
-              backgroundColor: Colors.white,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Dashboard",
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-                ),
-                Text(
-                  "Welcome Back!\n${widget.fullName} (${widget.role})",
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-              ],
-            ),
-          ],
+        title: ManagementTitle(
+          'Store overview',
+          subtitle: '${widget.fullName} · ${widget.role}',
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black54),
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               _loadDashboardData();
               _loadLowStockProducts();
               _loadRecentAttendance();
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.black54),
-            onPressed: () {},
           ),
         ],
       ),
@@ -709,24 +673,38 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             sectionTitle("Sales Activity"),
             const SizedBox(height: 10),
-            Row(
+            ManagementColumns(
               children: [
                 Expanded(
                   child: dashboardCard(
                     icon: Icons.shopping_cart,
-                    title: _isLoading ? "..." : "${_salesData['itemsSoldToday']}",
+                    title: _isLoading
+                        ? "..."
+                        : "${_salesData['itemsSoldToday']}",
                     subtitle: "Items Sold Today",
                     extra: "Today",
-                    color: Colors.pink.shade50,
+                    color: Volt.soft,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => _onItemTapped(1),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SalesHistoryPage(
+                          fullName: widget.fullName,
+                          role: widget.role,
+                          userId: widget.userId,
+                          location: widget.location,
+                        ),
+                      ),
+                    ),
                     child: dashboardCard(
                       icon: Icons.attach_money_rounded,
-                      title: _isLoading ? "..." : "₱${_salesData['totalSalesToday'].toStringAsFixed(2)}",
+                      title: _isLoading
+                          ? "..."
+                          : "₱${_salesData['totalSalesToday'].toStringAsFixed(2)}",
                       subtitle: "Sales Today",
                       extra: _salesChange,
                       color: Colors.orange.shade50,
@@ -743,13 +721,13 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 10),
             _isLoadingLowStock
                 ? Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(child: CircularProgressIndicator()),
-            )
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(child: CircularProgressIndicator()),
+                  )
                 : _buildLowStockSummary(),
 
             const SizedBox(height: 20),
@@ -767,20 +745,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.black54,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: "Dashboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Sales"),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory), label: "Inventory"),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Report"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
-      ),
+      bottomNavigationBar: null,
     );
   }
 
@@ -813,12 +778,12 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.pink.shade100),
+        border: Border.all(color: Volt.soft),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.pinkAccent),
+          Icon(icon, color: Volt.ink),
           const SizedBox(height: 8),
           Text(
             title,
@@ -829,7 +794,9 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             extra,
             style: TextStyle(
-              color: extraColor ?? (extra.contains('-') ? Colors.red : Colors.green),
+              color:
+                  extraColor ??
+                  (extra.contains('-') ? Colors.red : Colors.green),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -850,9 +817,25 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: const [
-              Expanded(flex: 2, child: Text("Name", style: TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(child: Text("Sold", style: TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(child: Text("Price", style: TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  "Name",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  "Sold",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  "Price",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
           const Divider(),
@@ -864,35 +847,40 @@ class _HomeScreenState extends State<HomeScreen> {
           else if (_topSelling.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('No sales data available', style: TextStyle(color: Colors.grey)),
+              child: Text(
+                'No sales data available',
+                style: TextStyle(color: Colors.grey),
+              ),
             )
           else
-            ..._topSelling.map((item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      item['name']?.toString() ?? 'Unknown Product',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+            ..._topSelling.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        item['name']?.toString() ?? 'Unknown Product',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      '${item['quantity'] ?? 0}',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    Expanded(
+                      child: Text(
+                        '${item['quantity'] ?? 0}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      '₱${(item['price'] ?? 0).toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    Expanded(
+                      child: Text(
+                        '₱${(item['price'] ?? 0).toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            )).toList(),
+            ),
         ],
       ),
     );

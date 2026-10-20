@@ -1,3 +1,8 @@
+import 'stock_repository.dart';
+
+import 'package:vasenizzpos/core/management_ui.dart';
+import 'package:vasenizzpos/core/store_connection.dart';
+import 'package:vasenizzpos/core/fastpas_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vasenizzpos/inventory/add_new_item.dart';
@@ -29,7 +34,8 @@ class BrandInventoryPage extends StatefulWidget {
 }
 
 class _BrandInventoryPageState extends State<BrandInventoryPage> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = StoreConnection.client;
+  final _stockRepository = StockRepository();
   bool removeMode = false;
   bool _isLoading = true;
   List<dynamic> _products = [];
@@ -42,8 +48,14 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
   String _selectedFilter = 'All';
   String _selectedSort = 'Name A-Z';
   String _selectedCategory = 'All Categories';
-  List<String> _filterOptions = ['All', 'Low Stock', 'Out of Stock'];
-  final List<String> _sortOptions = ['Name A-Z', 'Name Z-A', 'Price Low-High', 'Price High-Low', 'Stock Low-High'];
+  final List<String> _filterOptions = ['All', 'Low Stock', 'Out of Stock'];
+  final List<String> _sortOptions = [
+    'Name A-Z',
+    'Name Z-A',
+    'Price Low-High',
+    'Price High-Low',
+    'Stock Low-High',
+  ];
   List<String> _categoryOptions = ['All Categories'];
 
   @override
@@ -82,7 +94,7 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
       await _loadProducts();
       await _loadCategories();
     } catch (e) {
-      print('Error initializing data: $e');
+      debugPrint('Error initializing data: $e');
       _showErrorSnackbar('Failed to load inventory data');
     }
 
@@ -113,7 +125,7 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
         _applyFilterAndSort();
       });
     } catch (e) {
-      print('Error loading products: $e');
+      debugPrint('Error loading products: $e');
       _showErrorSnackbar('Failed to load products');
     }
   }
@@ -134,10 +146,10 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
           .toList();
 
       setState(() {
-        _categoryOptions = ['All Categories']..addAll(categoryNames.cast<String>());
+        _categoryOptions = ['All Categories', ...categoryNames.cast<String>()];
       });
     } catch (e) {
-      print('Error loading categories: $e');
+      debugPrint('Error loading categories: $e');
     }
   }
 
@@ -152,7 +164,8 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
     List<dynamic> filtered = _products.where((product) {
       final productName = product['name']?.toString().toLowerCase() ?? '';
       final productSku = product['sku']?.toString().toLowerCase() ?? '';
-      final categoryName = product['categories']?['name']?.toString().toLowerCase() ?? '';
+      final categoryName =
+          product['categories']?['name']?.toString().toLowerCase() ?? '';
       return productName.contains(query) ||
           productSku.contains(query) ||
           categoryName.contains(query);
@@ -170,7 +183,8 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
     if (_selectedFilter == 'Low Stock') {
       filtered = filtered.where((product) {
         final currentStock = product['branch_stock'][0]['current_stock'] ?? 0;
-        final lowStockThreshold = product['branch_stock'][0]['low_stock_threshold'] ?? 10;
+        final lowStockThreshold =
+            product['branch_stock'][0]['low_stock_threshold'] ?? 10;
         return currentStock > 0 && currentStock <= lowStockThreshold;
       }).toList();
     } else if (_selectedFilter == 'Out of Stock') {
@@ -203,102 +217,54 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
     });
   }
 
-  void _showFilterDialog() {
-    showDialog(
+  void _showFilterDialog() => _showChoiceDialog(
+    'Filter by Stock',
+    _filterOptions,
+    _selectedFilter,
+    (value) => _selectedFilter = value,
+  );
+  void _showCategoryDialog() => _showChoiceDialog(
+    'Filter by Category',
+    _categoryOptions,
+    _selectedCategory,
+    (value) => _selectedCategory = value,
+  );
+  void _showSortDialog() => _showChoiceDialog(
+    'Sort Products',
+    _sortOptions,
+    _selectedSort,
+    (value) => _selectedSort = value,
+  );
+  void _showChoiceDialog(
+    String title,
+    List<String> options,
+    String selected,
+    ValueChanged<String> update,
+  ) {
+    showDialog<void>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Filter by Stock"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: RadioGroup<String>(
+            groupValue: selected,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => update(value));
+              Navigator.pop(dialogContext);
+              _applyFilterAndSort();
+            },
+            child: ListView(
               shrinkWrap: true,
-              itemCount: _filterOptions.length,
-              itemBuilder: (context, index) {
-                final option = _filterOptions[index];
-                return RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: _selectedFilter,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedFilter = value!;
-                    });
-                    Navigator.pop(context);
-                    _applyFilterAndSort();
-                  },
-                );
-              },
+              children: [
+                for (final option in options)
+                  RadioListTile<String>(title: Text(option), value: option),
+              ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  void _showCategoryDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Filter by Category"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _categoryOptions.length,
-              itemBuilder: (context, index) {
-                final option = _categoryOptions[index];
-                return RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: _selectedCategory,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCategory = value!;
-                    });
-                    Navigator.pop(context);
-                    _applyFilterAndSort();
-                  },
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showSortDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Sort Products"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _sortOptions.length,
-              itemBuilder: (context, index) {
-                final option = _sortOptions[index];
-                return RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: _selectedSort,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedSort = value!;
-                    });
-                    Navigator.pop(context);
-                    _applyFilterAndSort();
-                  },
-                );
-              },
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -332,7 +298,10 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
               const SizedBox(height: 8),
               Text(
                 'Price: ₱${(product['price'] ?? 0).toStringAsFixed(2)}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Row(
@@ -341,7 +310,9 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                     'Stock: $currentStock',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isOutOfStock ? Colors.red : (isLowStock ? Colors.orange : Colors.green),
+                      color: isOutOfStock
+                          ? Colors.red
+                          : (isLowStock ? Colors.orange : Colors.green),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -349,7 +320,11 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                   if (isOutOfStock)
                     const Icon(Icons.error_outline, color: Colors.red, size: 16)
                   else if (isLowStock)
-                    const Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+                    const Icon(
+                      Icons.warning_amber,
+                      color: Colors.orange,
+                      size: 16,
+                    ),
                 ],
               ),
               if (isLowStock) ...[
@@ -374,10 +349,7 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -417,41 +389,32 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                 final int removeQty = int.tryParse(qtyController.text) ?? 0;
                 if (removeQty > 0 && removeQty <= currentStock) {
                   try {
-                    // Update stock in database
-                    await _supabase
-                        .from('branch_stock')
-                        .update({
-                      'current_stock': currentStock - removeQty,
-                      'last_updated': DateTime.now().toIso8601String(),
-                    })
-                        .eq('product_id', product['id'])
-                        .eq('branch_id', _branchId!);
-
-                    // Record inventory movement
-                    await _supabase
-                        .from('inventory_movements')
-                        .insert({
-                      'product_id': product['id'],
-                      'branch_id': _branchId!,
-                      'movement_type': 'out',
-                      'quantity': removeQty,
-                      'previous_stock': currentStock,
-                      'new_stock': currentStock - removeQty,
-                      'username': widget.fullName,
-                      'user_id': widget.userId,
-                      'reason': 'Manual stock adjustment',
-                    });
+                    await _stockRepository.adjust(
+                      StockAdjustment(
+                        productId: product['id'].toString(),
+                        branchId: _branchId!,
+                        previousStock: currentStock,
+                        delta: -removeQty,
+                        userId: widget.userId,
+                        username: widget.fullName,
+                      ),
+                    );
 
                     await _loadProducts(); // Refresh data
+                    if (!context.mounted) return;
                     Navigator.pop(context);
 
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Removed $removeQty from ${product['name']}'),
+                        content: Text(
+                          'Removed $removeQty from ${product['name']}',
+                        ),
                         backgroundColor: Colors.green,
                       ),
                     );
                   } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Error updating stock: $e'),
@@ -509,34 +472,22 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                 final int addQty = int.tryParse(qtyController.text) ?? 0;
                 if (addQty > 0) {
                   try {
-                    // Update stock in database
-                    await _supabase
-                        .from('branch_stock')
-                        .update({
-                      'current_stock': currentStock + addQty,
-                      'last_updated': DateTime.now().toIso8601String(),
-                    })
-                        .eq('product_id', product['id'])
-                        .eq('branch_id', _branchId!);
-
-                    // Record inventory movement
-                    await _supabase
-                        .from('inventory_movements')
-                        .insert({
-                      'product_id': product['id'],
-                      'branch_id': _branchId!,
-                      'movement_type': 'in',
-                      'quantity': addQty,
-                      'previous_stock': currentStock,
-                      'new_stock': currentStock + addQty,
-                      'user_id': widget.userId,
-                      'username': widget.fullName,
-                      'reason': 'Manual stock adjustment',
-                    });
+                    await _stockRepository.adjust(
+                      StockAdjustment(
+                        productId: product['id'].toString(),
+                        branchId: _branchId!,
+                        previousStock: currentStock,
+                        delta: addQty,
+                        userId: widget.userId,
+                        username: widget.fullName,
+                      ),
+                    );
 
                     await _loadProducts(); // Refresh data
+                    if (!context.mounted) return;
                     Navigator.pop(context);
 
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Added $addQty to ${product['name']}'),
@@ -544,6 +495,7 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                       ),
                     );
                   } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Error updating stock: $e'),
@@ -553,7 +505,9 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                   }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter a valid quantity")),
+                    const SnackBar(
+                      content: Text("Please enter a valid quantity"),
+                    ),
                   );
                 }
               },
@@ -575,7 +529,11 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
     return InkWell(
       onTap: () => _showProductDetails(product),
       child: Container(
-        color: isOutOfStock ? Colors.red[50] : (isLowStock ? Colors.orange[50] : (index % 2 == 0 ? Colors.pink[50] : Colors.white)),
+        color: isOutOfStock
+            ? Colors.red[50]
+            : (isLowStock
+                  ? Colors.orange[50]
+                  : (index % 2 == 0 ? Volt.soft : Colors.white)),
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
@@ -607,11 +565,11 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                 ),
               ),
             ),
+            Expanded(child: _TableCell(product['categories']?['name'] ?? '—')),
             Expanded(
-              child: _TableCell(product['categories']?['name'] ?? '—'),
-            ),
-            Expanded(
-              child: _TableCell('₱${(product['price'] ?? 0).toStringAsFixed(2)}'),
+              child: _TableCell(
+                '₱${(product['price'] ?? 0).toStringAsFixed(2)}',
+              ),
             ),
             Expanded(
               child: Row(
@@ -621,16 +579,28 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
                     currentStock.toString(),
                     style: TextStyle(
                       fontSize: 12,
-                      color: isOutOfStock ? Colors.red : (isLowStock ? Colors.orange : Colors.black87),
-                      fontWeight: (isOutOfStock || isLowStock) ? FontWeight.bold : FontWeight.normal,
+                      color: isOutOfStock
+                          ? Colors.red
+                          : (isLowStock ? Colors.orange : Colors.black87),
+                      fontWeight: (isOutOfStock || isLowStock)
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                   if (isOutOfStock) ...[
                     const SizedBox(width: 4),
-                    const Icon(Icons.error_outline, color: Colors.red, size: 14),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 14,
+                    ),
                   ] else if (isLowStock) ...[
                     const SizedBox(width: 4),
-                    const Icon(Icons.warning_amber, color: Colors.orange, size: 14),
+                    const Icon(
+                      Icons.warning_amber,
+                      color: Colors.orange,
+                      size: 14,
+                    ),
                   ],
                 ],
               ),
@@ -639,7 +609,9 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
               child: Center(
                 child: IconButton(
                   icon: Icon(
-                    removeMode ? Icons.delete_outline : Icons.add_circle_outline,
+                    removeMode
+                        ? Icons.delete_outline
+                        : Icons.add_circle_outline,
                     color: removeMode ? Colors.redAccent : Colors.green,
                     size: 20,
                   ),
@@ -662,262 +634,248 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8EDF3),
+      backgroundColor: Volt.background,
       appBar: AppBar(
-        backgroundColor: Colors.orangeAccent,
+        backgroundColor: Volt.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Volt.ink),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Row(
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white,
-              child: Icon(Icons.business, color: Colors.orangeAccent, size: 20),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.brandName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.white,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    "${widget.branchManager} (${widget.branchCode}) - ${widget.branchName}",
-                    style: const TextStyle(fontSize: 11, color: Colors.white70),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        title: ManagementTitle(
+          'Brand inventory',
+          subtitle: '${widget.fullName} · ${widget.role}',
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              children: [
-                _smallButton(
-                  "Refresh",
-                  Colors.white,
-                  Colors.orangeAccent,
-                  _loadProducts,
-                ),
-                const SizedBox(width: 6),
-                _smallButton(
-                  removeMode ? "Done" : "Remove Stock",
-                  Colors.white,
-                  Colors.redAccent,
-                      () {
-                    setState(() {
-                      removeMode = !removeMode;
-                    });
-                  },
-                ),
-              ],
-            ),
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _loadProducts,
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: removeMode ? 'Finish removing stock' : 'Remove stock',
+            onPressed: () => setState(() => removeMode = !removeMode),
+            icon: Icon(removeMode ? Icons.check : Icons.remove_circle_outline),
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.orangeAccent))
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.orangeAccent),
+            )
           : Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            // Search and filter bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.black26),
-              ),
-              child: Row(
+              padding: const EdgeInsets.all(12),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      "${_filteredProducts.length} Products",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        fontSize: 12,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                  // Search and filter bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: "Search products...",
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                        hintStyle: TextStyle(fontSize: 12),
-                      ),
-                      style: const TextStyle(fontSize: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.black26),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  _actionButton("Category", _showCategoryDialog),
-                  const SizedBox(width: 6),
-                  _actionButton("Filter", _showFilterDialog),
-                  const SizedBox(width: 6),
-                  _actionButton("Sort", _showSortDialog),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Active filters display
-            if (_selectedCategory != 'All Categories' || _selectedFilter != 'All')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    if (_selectedCategory != 'All Categories')
-                      _filterChip(
-                        'Category: $_selectedCategory',
-                        onRemove: () {
-                          setState(() {
-                            _selectedCategory = 'All Categories';
-                            _applyFilterAndSort();
-                          });
-                        },
-                      ),
-                    if (_selectedFilter != 'All')
-                      _filterChip(
-                        'Stock: $_selectedFilter',
-                        onRemove: () {
-                          setState(() {
-                            _selectedFilter = 'All';
-                            _applyFilterAndSort();
-                          });
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            _smallButton(
-              "Add Item",
-              Colors.white,
-              Colors.green,
-                  () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddNewItemPage(
-                      brandId: _brandId,
-                      branchId: _branchId,
-                      brandName: widget.brandName,
-                      branchName: widget.branchName,
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-
-            // Products table
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black26),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: [
-                    // Table header
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.pink[50],
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          topRight: Radius.circular(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${_filteredProducts.length} products',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                      ),
-                      child: const Row(
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            hintText: 'Search products',
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _actionButton('Category', _showCategoryDialog),
+                            _actionButton('Filter', _showFilterDialog),
+                            _actionButton('Sort', _showSortDialog),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Active filters display
+                  if (_selectedCategory != 'All Categories' ||
+                      _selectedFilter != 'All')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: _TableHeaderCell("Product"),
-                          ),
-                          Expanded(
-                            child: _TableHeaderCell("Category"),
-                          ),
-                          Expanded(
-                            child: _TableHeaderCell("Price"),
-                          ),
-                          Expanded(
-                            child: _TableHeaderCell("Stock"),
-                          ),
-                          Expanded(
-                            child: _TableHeaderCell("Action"),
-                          ),
+                          if (_selectedCategory != 'All Categories')
+                            _filterChip(
+                              'Category: $_selectedCategory',
+                              onRemove: () {
+                                setState(() {
+                                  _selectedCategory = 'All Categories';
+                                  _applyFilterAndSort();
+                                });
+                              },
+                            ),
+                          if (_selectedFilter != 'All')
+                            _filterChip(
+                              'Stock: $_selectedFilter',
+                              onRemove: () {
+                                setState(() {
+                                  _selectedFilter = 'All';
+                                  _applyFilterAndSort();
+                                });
+                              },
+                            ),
                         ],
                       ),
                     ),
-                    const Divider(height: 1, color: Colors.black26, thickness: 1),
-
-                    // Products list
-                    Expanded(
-                      child: _filteredProducts.isEmpty
-                          ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'No products found',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'in ${widget.branchName}',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                            if (_searchController.text.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                'Search: "${_searchController.text}"',
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                              ),
-                            ],
-                          ],
+                  _smallButton("Add Item", Colors.white, Colors.green, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddNewItemPage(
+                          brandId: _brandId,
+                          branchId: _branchId,
+                          brandName: widget.brandName,
+                          branchName: widget.branchName,
                         ),
-                      )
-                          : ListView.builder(
-                        itemCount: _filteredProducts.length,
-                        itemBuilder: (context, index) =>
-                            _tableRow(_filteredProducts[index], index),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+
+                  // Products table
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, box) => SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: box.maxWidth < 680 ? 680 : box.maxWidth,
+                          height: box.maxHeight,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: Colors.black26),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                // Table header
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Volt.soft,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(8),
+                                      topRight: Radius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: _TableHeaderCell("Product"),
+                                      ),
+                                      Expanded(
+                                        child: _TableHeaderCell("Category"),
+                                      ),
+                                      Expanded(
+                                        child: _TableHeaderCell("Price"),
+                                      ),
+                                      Expanded(
+                                        child: _TableHeaderCell("Stock"),
+                                      ),
+                                      Expanded(
+                                        child: _TableHeaderCell("Action"),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(
+                                  height: 1,
+                                  color: Colors.black26,
+                                  thickness: 1,
+                                ),
+
+                                // Products list
+                                Expanded(
+                                  child: _filteredProducts.isEmpty
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.inventory_2_outlined,
+                                                size: 48,
+                                                color: Colors.grey,
+                                              ),
+                                              const SizedBox(height: 12),
+                                              const Text(
+                                                'No products found',
+                                                style: TextStyle(fontSize: 14),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'in ${widget.branchName}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              if (_searchController
+                                                  .text
+                                                  .isNotEmpty) ...[
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  'Search: "${_searchController.text}"',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        )
+                                      : ListView.builder(
+                                          itemCount: _filteredProducts.length,
+                                          itemBuilder: (context, index) =>
+                                              _tableRow(
+                                                _filteredProducts[index],
+                                                index,
+                                              ),
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _smallButton(
-      String text, Color bg, Color borderColor, VoidCallback onPressed) {
+    String text,
+    Color bg,
+    Color borderColor,
+    VoidCallback onPressed,
+  ) {
     return InkWell(
       onTap: onPressed,
       child: Container(
@@ -944,17 +902,12 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         minimumSize: Size.zero,
       ),
       onPressed: onPressed,
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 11),
-      ),
+      child: Text(text, style: const TextStyle(fontSize: 11)),
     );
   }
 
@@ -962,10 +915,7 @@ class _BrandInventoryPageState extends State<BrandInventoryPage> {
     return Container(
       margin: const EdgeInsets.only(right: 6),
       child: Chip(
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 10),
-        ),
+        label: Text(label, style: const TextStyle(fontSize: 10)),
         onDeleted: onRemove,
         deleteIcon: const Icon(Icons.close, size: 14),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1001,10 +951,8 @@ class _TableHeaderCell extends StatelessWidget {
 
 class _TableCell extends StatelessWidget {
   final String text;
-  final Color textColor;
-  final bool isBold;
 
-  const _TableCell(this.text, {this.textColor = Colors.black87, this.isBold = false});
+  const _TableCell(this.text);
 
   @override
   Widget build(BuildContext context) {
@@ -1012,9 +960,9 @@ class _TableCell extends StatelessWidget {
       text,
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: textColor,
+        color: Colors.black87,
         fontSize: 11,
-        fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+        fontWeight: FontWeight.normal,
       ),
       overflow: TextOverflow.ellipsis,
     );
