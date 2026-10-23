@@ -6,9 +6,9 @@ The name combines **fast** and **paspas**, a Cebuano word associated with speed.
 
 ## Project status
 
-**Work in progress.** The Graphite Volt redesign includes sign-in, product-first Home, order review, payment, and receipt screens. Management screens now share the same theme, compact headers, responsive forms, and navigation back to Home. The FastPas speed mark is used for launcher icons. The backend migration and AI features remain planned. The application is not ready for live store use.
+**Work in progress.** The default app now uses Supabase Auth, owner-created business workspaces, staff permissions, and hybrid cash selling. A fresh Supabase project still needs to be configured and tested. The Graphite Volt redesign covers the previous selling and management screens; those remain available through a separate legacy entry point while their features move to the new business-scoped contract. AI features remain planned. The application is not ready for live store use.
 
-Existing functionality includes:
+The legacy interface includes:
 
 - Product browsing, cart, discounts, checkout, and receipts.
 - Branch inventory, suppliers, and stock movement history.
@@ -21,13 +21,13 @@ These workflows still require full end-to-end validation.
 
 **Graphite Volt** uses charcoal (`#202528`), electric lime (`#CEF54A`), and off-white (`#FAFAFA`). Home opens directly to products, with search, category filters, quantity controls, and a persistent checkout bar.
 
-<img src="docs/screenshots/home-phone.png" alt="FastPas POS product homepage running with sample data" width="300">
+<img src="docs/screenshots/home-phone.jpg" alt="FastPas POS product homepage running with sample data" width="300">
 
 *Flutter UI preview with sample data. No store transactions are saved. Products currently use category icons; barcode scanning is disabled and planned.*
 
-More screenshots: [tablet](docs/screenshots/home-tablet.png), [order review](docs/screenshots/order-review-phone.png), [payment](docs/screenshots/payment-phone.png), and [receipt](docs/screenshots/receipt-phone.png).
+More screenshots: [tablet](docs/screenshots/home-tablet.jpg), [order review](docs/screenshots/order-review-phone.jpg), [payment](docs/screenshots/payment-phone.jpg), and [receipt](docs/screenshots/receipt-phone.jpg).
 
-Management previews: [staff](docs/screenshots/staff-phone.png), [suppliers](docs/screenshots/suppliers-phone.png), and [reports](docs/screenshots/reports-tablet.png).
+Management previews: [staff](docs/screenshots/staff-phone.jpg), [suppliers](docs/screenshots/suppliers-phone.jpg), and [reports](docs/screenshots/reports-tablet.jpg).
 
 ## Local UI preview
 
@@ -42,25 +42,25 @@ This entry point uses local sample data. Management requests use a read-only tra
 
 Branch management and branch inventory use shared screens driven by saved branch identities. Session navigation, sign-in, calendar actions, stock adjustments, sale persistence, receipt reads, pricing, and report calculations now have shared modules. Unused parallel selling screens were removed.
 
-See [architecture](docs/ARCHITECTURE.md) and the [database contract inventory](docs/DATABASE.md). The new [business workspace foundation](docs/BUSINESSES.md) has an additive migration and a separate Supabase Auth entry point. Legacy retail authentication and data migration remain unfinished.
+See [architecture](docs/ARCHITECTURE.md), [database contracts](docs/DATABASE.md), and [business workspaces](docs/BUSINESSES.md).
 
-To develop owner-created business workspaces after validating and applying the foundation migration to a disposable Supabase project:
+## Backend setup
 
-```sh
-flutter run -t lib/workspaces/main.dart --dart-define-from-file=config/supabase.local.json
-```
-
-This staged entry point supports registration, sign-in, owner-created businesses, staff invitations, and accessible branches. With all three additive migrations available in a disposable project, branches open [hybrid cash selling](docs/HYBRID.md): downloaded catalog, local receipts and stock deductions, pending uploads, and automatic retry while open. It does not open legacy retail screens. Configure email confirmation before testing owner creation. The normal entry point still uses the legacy single-business backend; do not deploy it as a multi-business service. SQLite persistence targets Android/iOS/macOS; this staged flow is not a web preview.
-
-To run the normal store app, create `config/supabase.local.json` from the example configuration and supply your own project values:
+Follow [fresh Supabase setup](docs/SETUP.md) to create a development project, apply the four migrations in order, enable email confirmation, configure `fastpas://auth-callback`, and fill the ignored `config/supabase.local.json` file. No legacy export is needed for a new database.
 
 ```sh
 flutter run --dart-define-from-file=config/supabase.local.json
 ```
 
+The default app supports registration, verification resend, password recovery, owner-created businesses, staff invitations and access controls, and accessible branches. Branches open [hybrid cash selling](docs/HYBRID.md): downloaded catalog, local receipts and stock deductions, pending uploads, and automatic retry while open. SQLite persistence targets Android/iOS/macOS; this flow is not a web preview.
+
+The explicit `lib/workspaces/main.dart` target launches the same app. `lib/legacy_main.dart` retains the historical single-store flow for migration development and requires its old schema. Workspace navigation does not open those legacy routes. Broader catalog, attendance, supplier, reporting, and selling UI integration remains planned.
+
 ## Validation
 
-`flutter analyze` is clean. All 94 unit and widget tests pass, including local SQLite persistence, offline cash checkout, upload retries, account isolation, and existing selling/management regressions. The three additive database migrations pass 62 embedded PostgreSQL checks with Auth identity stubbed. The staged hybrid Android debug APK builds. The earlier sample sale and branch navigation emulator check covers the Phase 2 sample flow, not this new backend. Build results and remaining acceptance checks are recorded in the roadmap.
+`flutter analyze` is clean. All 120 unit and widget tests pass, including local SQLite persistence, offline cash checkout, upload retries, account isolation, SDK account recovery, staff branch reassignment, and existing selling/management regressions. The four additive database migrations pass 95 embedded PostgreSQL checks with Auth identity stubbed. The earlier sample sale and branch navigation emulator check covers the Phase 2 sample flow, not this new backend. Build results and remaining acceptance checks are recorded in the roadmap.
+
+The default workspace Android debug APK builds with placeholder backend configuration. Real Supabase Auth, email links, and multi-device acceptance remain unverified. Android callback declarations are packaged; iOS configuration is present but has not been built on macOS.
 
 The Android build uses Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.21 and Java 17 bytecode. The development baseline is Flutter 3.47.4 / Dart 3.13. Release signing and physical-device validation remain planned.
 
@@ -74,7 +74,8 @@ The Android build uses Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.2
 6. Atomic checkout and saved receipts.
 7. Returns, refunds, and cashier shifts.
 8. Reports and optional modules.
-9. Device pilot and release.
+9. Offline synchronization.
+10. Device pilot and release.
 
 See the [product roadmap](docs/ROADMAP.md) for scope and current progress.
 
@@ -85,6 +86,6 @@ AI sales summaries and inventory insights are planned after the core retail work
 - Flutter / Dart.
 - Supabase client integration.
 - Android is the first intended release target; other platform folders do not establish platform support.
-- Multi-business workspaces are in development; legacy retail tables still require ownership migration and isolation checks.
+- Multi-business workspaces are in development; broader feature adaptation and deployed isolation checks remain. Optional old-record imports require a separate tenant migration.
 
 The internal Dart package remains `vasenizzpos` while the application is being adapted to FastPas.

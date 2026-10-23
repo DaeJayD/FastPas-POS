@@ -24,6 +24,7 @@ void main() {
   var received = <Map<String, dynamic>>[];
   var loseFirstReply = false;
   var membershipRevoked = false;
+  var branchRevoked = false;
   var denySale = false;
   var offline = false;
   var denyDirectory = false;
@@ -58,6 +59,7 @@ void main() {
     received = [];
     loseFirstReply = false;
     membershipRevoked = false;
+    branchRevoked = false;
     denySale = false;
     offline = false;
     denyDirectory = false;
@@ -100,7 +102,7 @@ void main() {
         if (route.endsWith('/pos_memberships')) {
           response = membershipRevoked ? null : {'role': 'cashier'};
         } else if (route.endsWith('/pos_branches')) {
-          response = membershipRevoked ? null : {'id': branch};
+          response = membershipRevoked || branchRevoked ? null : {'id': branch};
         } else if (route.endsWith('/pos_sync_cash_sale')) {
           final payload =
               (jsonDecode(request.body) as Map<String, dynamic>)['sale']
@@ -195,6 +197,30 @@ void main() {
       throwsStateError,
     );
     expect(received, isEmpty);
+  });
+  test('Branch-only revocation disables selling and retains the original pending receipt', () async {
+    final receipt = await store.checkout({'p1': 2}, 200);
+    branchRevoked = true;
+    await expectLater(
+      SyncService(client, store).synchronize(),
+      throwsStateError,
+    );
+    expect(membershipRevoked, isFalse);
+    expect(received, isEmpty);
+    expect(await store.canSell(), isFalse);
+    final saved = (await store.receipts()).single;
+    expect(saved['id'], receipt);
+    expect(saved['status'], 'pending');
+    expect(
+      (jsonDecode(saved['payload'] as String) as Map)['branch_id'],
+      branch,
+    );
+    // Restoring branch access uploads the same receipt, without moving stores.
+    branchRevoked = false;
+    await SyncService(client, store).synchronize();
+    expect(received.single['id'], receipt);
+    expect((await store.receipts()).single['status'], 'synced');
+    expect(await store.canSell(), isTrue);
   });
   test(
     'Offline business discovery uses only the signed-in account cache',

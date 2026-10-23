@@ -162,7 +162,9 @@ class WorkspaceRepository {
 
   Future<Map<String, dynamic>> staffAccess(String businessId) async =>
       Map<String, dynamic>.from(
-        await client.rpc('pos_staff_access', params: {'business': businessId})
+        await client
+                .rpc('pos_staff_access', params: {'business': businessId})
+                .timeout(const Duration(seconds: 12))
             as Map,
       );
 
@@ -179,5 +181,22 @@ class WorkspaceRepository {
 
   Future<void> cancelInvitation(String code) async {
     await client.rpc('pos_cancel_invitation', params: {'invite_code': code});
+  }
+
+  Future<void> setStaffBranches(
+    String businessId,
+    String userId,
+    List<String> branchIds,
+  ) async {
+    await client
+        .rpc(
+          'pos_set_staff_branches',
+          params: {
+            'business': businessId,
+            'member': userId,
+            'branches': branchIds,
+          },
+        )
+        .timeout(const Duration(seconds: 12));
   }
 }

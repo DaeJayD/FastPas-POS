@@ -25,6 +25,7 @@ class _StaffAccessScreenState extends State<StaffAccessScreen> {
   String? _error;
   StreamSubscription<AuthState>? _auth;
   late final String? _actor;
+  BuildContext? _dialogContext;
 
   @override
   void initState() {
@@ -33,6 +34,11 @@ class _StaffAccessScreenState extends State<StaffAccessScreen> {
     _auth = widget.repository.client.auth.onAuthStateChange.listen(
       (event) {
         if (mounted && event.session?.user.id != _actor) {
+          final dialog = _dialogContext;
+          _dialogContext = null;
+          if (dialog != null && dialog.mounted) {
+            Navigator.pop(dialog, false);
+          }
           setState(() {
             _data = null;
             _error = 'Account changed. Return to your businesses.';
@@ -94,26 +100,102 @@ class _StaffAccessScreenState extends State<StaffAccessScreen> {
 
   Future<void> _refresh() => _run(_load);
 
+  Future<void> _editBranches(Map member) async {
+    if (_busy) return;
+    final branches = List<Map>.from(_data?['branches'] as List? ?? []);
+    final selected = Set<String>.from(member['branch_ids'] as List? ?? []);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        _dialogContext = dialogContext;
+        return StatefulBuilder(
+          builder: (context, update) => AlertDialog(
+            title: const Text('Branch access'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member['email'] as String? ?? member['user_id'] as String,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Saving cancels unused invitations for this business. Offline devices update when they reconnect.',
+                    ),
+                    for (final branch in branches)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(branch['name'] as String),
+                        value: selected.contains(branch['id']),
+                        onChanged: (checked) => update(() {
+                          if (checked == true) {
+                            selected.add(branch['id'] as String);
+                          } else {
+                            selected.remove(branch['id']);
+                          }
+                        }),
+                      ),
+                    if (selected.isEmpty)
+                      const Text(
+                        'No branches selected. They will remain a member but cannot open any branch.',
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Save branches'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    _dialogContext = null;
+    if (confirmed != true || !mounted) return;
+    await _run(() async {
+      await widget.repository.setStaffBranches(
+        widget.business.id,
+        member['user_id'] as String,
+        selected.toList()..sort(),
+      );
+      await _load();
+    });
+  }
+
   Future<void> _remove(Map member) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove staff access?'),
-        content: Text(
-          '${member['email']} will lose access to this business. Their saved sales remain. Offline devices learn the change when they reconnect.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep access'),
+      builder: (context) {
+        _dialogContext = context;
+        return AlertDialog(
+          title: const Text('Remove staff access?'),
+          content: Text(
+            '${member['email']} will lose access to this business. Their saved sales remain. Offline devices learn the change when they reconnect.',
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove access'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep access'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Remove access'),
+            ),
+          ],
+        );
+      },
     );
+    _dialogContext = null;
     if (confirmed != true || !mounted) return;
     await _run(() async {
       await widget.repository.changeStaffAccess(
@@ -159,6 +241,23 @@ class _StaffAccessScreenState extends State<StaffAccessScreen> {
                     if (member['role'] == 'owner')
                       const Text('Owner')
                     else ...[
+                      if (member['branch_ids'] is List &&
+                          _data?['branches'] is List) ...[
+                        Text(
+                          (member['branch_ids'] as List).isEmpty
+                              ? 'No branch access'
+                              : 'Branches: ${(_data!['branches'] as List).where((branch) => (member['branch_ids'] as List).contains(branch['id'])).map((branch) => branch['name']).join(', ')}',
+                        ),
+                        TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => _editBranches(member as Map),
+                          child: const Text('Edit branch access'),
+                        ),
+                      ] else
+                        const Text(
+                          'Apply the staff branch-access migration to manage assigned branches.',
+                        ),
                       DropdownButton<String>(
                         isExpanded: true,
                         value: member['role'] as String,

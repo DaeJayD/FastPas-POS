@@ -1,4 +1,8 @@
-# Existing database contract
+# Database contracts
+
+New installations use the four migrations under `supabase/migrations`, starting with business workspaces, then hybrid cash sales, staff access, and staff branch assignments. Follow [fresh setup](SETUP.md). There is no existing Supabase database to migrate for the current setup. A legacy export is needed only if old records are imported later.
+
+## Legacy source inventory
 
 This inventory is inferred from legacy application queries. The additive workspace migration under `supabase/migrations` defines the new business foundation, not the legacy schema. Legacy database types, constraints, indexes, triggers, grants, row policies, and production contents have not been verified. No remote migration has run.
 
@@ -21,7 +25,7 @@ This inventory is inferred from legacy application queries. The additive workspa
 
 ## Migration boundary
 
-Phase 3 must start with a schema-only export and an access-policy review from the actual project. Identify which employee identifier is referenced by each foreign key. Record all constraints and view definitions before writing migrations. Rehearse against a copy with representative data and test backups before any production migration.
+For an optional legacy import, first obtain a schema-only export and review access policies from that database. Identify which employee identifier is referenced by each foreign key. Record all constraints and view definitions before writing import migrations. Rehearse against a copy with representative data and test backups before any production migration. The fresh setup does not require this step.
 
 The employee-table username/password lookup remains a legacy contract. Replace it with Supabase Auth, verified role membership, and branch policies. UI role checks and `PosSession` are presentation state and do not enforce server authorization. Do not carry plaintext or default employee passwords into the new identity design.
 

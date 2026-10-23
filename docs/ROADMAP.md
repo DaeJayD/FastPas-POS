@@ -8,7 +8,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 |---|---|---|
 | 1. Interface | Graphite Volt theme, product-first Home, responsive selling flow, and management layouts | Complete for this UI scope |
 | 2. Technical baseline and refactor | Compatible Android build tools, shared navigation and data access, duplicated branch screen consolidation, and database inventory | Complete for this refactor scope |
-| 3. Data and identity | Owner-created businesses, Supabase Auth, memberships, invitations, tenant isolation, and branch access policies | In progress; foundation migration and workspace client |
+| 3. Data and identity | Owner-created businesses, Supabase Auth, account recovery, memberships, invitations, tenant isolation, and branch access policies | Implemented development foundation; fresh backend and hosted acceptance pending |
 | 4. Business setup | Business details, receipts, settings, and configurable branches | Planned |
 | 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Planned |
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Planned |
@@ -68,4 +68,14 @@ See [business workspaces](BUSINESSES.md) for the accepted ownership model and ro
 
 The staged workspace branch route now has a separate cash-sale contract with SQLite persistence and queued cloud uploads. See [hybrid operation](HYBRID.md). Attendance, suppliers, shared reports, files, and calendar sync still require their tenant migrations. This cash-sale slice does not complete the full offline phase or establish release readiness.
 
-Phase 3 now includes Owner-only staff access controls: member listing, role changes, access removal, pending invitation cancellation, and private audit records. Owner memberships are protected from these operations. Offline devices receive changes on reconnect; previously recorded sales remain. The three additive migrations still require real Supabase acceptance and the legacy schema export before existing store records can be migrated.
+Phase 3 now includes Owner-only staff access controls: member listing, role changes, access removal, pending invitation cancellation, and private audit records. Owner memberships are protected from these operations. Offline devices receive changes on reconnect; previously recorded sales remain.
+
+The default app now opens business workspaces with registration, verification resend, and password recovery. Android and iOS callback declarations use `fastpas://auth-callback`; PKCE exchanges are serialized and duplicate links are ignored after successful exchange. Recovery state is established before the first screen subscribes. The historical single-store flow is retained under `lib/legacy_main.dart`.
+
+There is no existing Supabase project for this setup. Follow [fresh setup](SETUP.md) to apply all four migrations and configure Auth and email. A legacy schema export is needed only if old records are imported later. Real Supabase isolation, email, callback routing, and two-device acceptance remain outstanding, so Phase 3 is not marked complete.
+
+Phase 3 also includes Owner-managed staff branch assignments in a fourth migration. Branch access can be changed or cleared without removing membership or sales. Changes cancel that employee's unused invitations for the business and record previous/new assignments privately. The server rejects cross-business branches and Owner edits; other memberships remain unaffected. The editor closes on account switches, and old backend versions cannot submit assignments. Automated reconnect tests retain pending receipts on branch revocation and upload the same receipts after access is restored.
+
+Validation on 24 October 2026: all 120 Flutter tests pass serially, full static analysis reports no issues, and all four migrations pass 95 embedded PostgreSQL checks with Auth identity stubbed. Actual Supabase Auth, PostgREST, email, and device acceptance remain pending.
+
+The default Android debug APK rebuilt successfully with the branch editor and placeholder backend configuration. Android and iOS XML parse; iOS compilation is unverified. Native callbacks and offline synchronization still require device acceptance against Supabase.

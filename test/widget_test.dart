@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vasenizzpos/catalog/catalog_source.dart';
 import 'package:vasenizzpos/core/fastpas_theme.dart';
-import 'package:vasenizzpos/main.dart';
+import 'package:vasenizzpos/auth/login_screen.dart';
 import 'package:vasenizzpos/pos/product_home_screen.dart';
 import 'package:vasenizzpos/preview/sample_catalog.dart';
 

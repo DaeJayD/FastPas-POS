@@ -1,8 +1,10 @@
 # Application structure
 
-The normal entry point is `lib/main.dart`. It reads local build configuration and initializes the store connection. `lib/preview/main.dart` is a separate sample entry point with a local read-only transport. The production entry point never enables that transport.
+The normal entry point is `lib/main.dart`, which delegates to the business workspace app. It reads local build configuration and initializes Supabase Auth with PKCE. `lib/preview/main.dart` is a separate sample entry point with a local read-only transport. The normal entry point never enables that transport.
 
-`lib/workspaces/main.dart` is the staged multi-business entry point using Supabase Auth and the additive `pos_*` workspace schema. It supports owner onboarding, business selection, staff invitation codes, and branch access. It cannot enter legacy retail routes; those still require a verified tenant migration. See [business workspaces](BUSINESSES.md).
+`lib/workspaces/main.dart` implements the default multi-business app using the `pos_*` schema. It supports owner onboarding, business selection, staff invitation codes, and branch access. `workspace_account.dart` owns password recovery state and serializes callback exchanges before screens subscribe. `app_links` delivers initial and running-app links; automatic SDK URI handling is disabled to avoid duplicate exchanges. See [fresh setup](SETUP.md) and [business workspaces](BUSINESSES.md).
+
+`lib/legacy_main.dart` retains the old single-store entry point. Workspace navigation cannot enter its routes. Later feature phases will adapt those screens to the new database; any optional old-record import needs a verified tenant migration first.
 
 The staged branch flow uses `hybrid/local_store.dart` for scoped SQLite persistence and atomic local cash checkout, `hybrid/sync_service.dart` for permission checks and durable upload processing, and `hybrid/hybrid_pos_screen.dart` for cash selling and sync status. The additive cash-sale migration supplies server transactions. See [hybrid operation](HYBRID.md) for the offline access window, shortage policy, and remaining features.
 

@@ -10,12 +10,26 @@ import 'package:vasenizzpos/workspaces/workspace_repository.dart';
 class StaffFixture extends WorkspaceRepository {
   StaffFixture(super.client);
   int changes = 0;
+  final branchIds = <String>['main'];
+  final assignments = <List<String>>[];
+  bool failAssignment = false;
+  bool oldSchema = false;
   @override
   Future<Map<String, dynamic>> staffAccess(String businessId) async => {
     'members': [
       {'user_id': 'owner', 'email': 'owner@example.test', 'role': 'owner'},
-      {'user_id': 'staff', 'email': 'staff@example.test', 'role': 'cashier'},
+      {
+        'user_id': 'staff',
+        'email': 'staff@example.test',
+        'role': 'cashier',
+        if (!oldSchema) 'branch_ids': List<String>.of(branchIds),
+      },
     ],
+    if (!oldSchema)
+      'branches': [
+        {'id': 'main', 'name': 'Main branch'},
+        {'id': 'other', 'name': 'Second branch'},
+      ],
     'invitations': [],
   };
   @override
@@ -25,6 +39,21 @@ class StaffFixture extends WorkspaceRepository {
     String? role,
   ) async {
     changes++;
+  }
+
+  @override
+  Future<void> setStaffBranches(
+    String businessId,
+    String userId,
+    List<String> branchIds,
+  ) async {
+    if (failAssignment) throw StateError('Denied');
+    expect(businessId, 'business');
+    expect(userId, 'staff');
+    assignments.add(List<String>.of(branchIds));
+    this.branchIds
+      ..clear()
+      ..addAll(branchIds);
   }
 }
 
@@ -63,8 +92,19 @@ void main() {
   });
   setUp(() => identity('owner'));
   tearDownAll(() => client.dispose());
-  Future<void> open(WidgetTester tester, StaffFixture repository) async {
-    tester.view.physicalSize = const Size(360, 800);
+  Future<void> tapControl(WidgetTester tester, Finder target) async {
+    await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> open(
+    WidgetTester tester,
+    StaffFixture repository, {
+    double width = 360,
+  }) async {
+    tester.view.physicalSize = Size(width, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -119,4 +159,118 @@ void main() {
     expect(find.text('staff@example.test'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final width in [360.0, 1024.0]) {
+    testWidgets(
+      'Branch assignment fits $width and saves only the selected branches',
+      (tester) async {
+        final repository = StaffFixture(client);
+        await open(tester, repository, width: width);
+        await tester.tap(find.text('Edit branch access'));
+        await tester.pumpAndSettle();
+        expect(find.byType(CheckboxListTile), findsNWidgets(2));
+        await tapControl(
+          tester,
+          find.widgetWithText(CheckboxListTile, 'Main branch'),
+        );
+        await tapControl(
+          tester,
+          find.widgetWithText(CheckboxListTile, 'Second branch'),
+        );
+        await tapControl(tester, find.text('Save branches'));
+        await tester.pumpAndSettle();
+        expect(repository.assignments, [
+          ['other'],
+        ]);
+        expect(find.text('Branches: Second branch'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('Cancelled branch edits do not change access', (tester) async {
+    final repository = StaffFixture(client);
+    await open(tester, repository);
+    await tester.tap(find.text('Edit branch access'));
+    await tester.pumpAndSettle();
+    await tapControl(
+      tester,
+      find.widgetWithText(CheckboxListTile, 'Main branch'),
+    );
+    expect(find.textContaining('No branches selected.'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(repository.assignments, isEmpty);
+    expect(find.text('Branches: Main branch'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'Clearing branches preserves membership and shows no branch access',
+    (tester) async {
+      final repository = StaffFixture(client);
+      await open(tester, repository);
+      await tester.tap(find.text('Edit branch access'));
+      await tester.pumpAndSettle();
+      await tapControl(
+        tester,
+        find.widgetWithText(CheckboxListTile, 'Main branch'),
+      );
+      await tapControl(tester, find.text('Save branches'));
+      await tester.pumpAndSettle();
+      expect(repository.assignments, [<String>[]]);
+      expect(find.text('No branch access'), findsOneWidget);
+      expect(find.text('staff@example.test'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'Changing accounts closes branch editor and cannot submit old staff access',
+    (tester) async {
+      final repository = StaffFixture(client);
+      await open(tester, repository);
+      await tester.tap(find.text('Edit branch access'));
+      await tester.pumpAndSettle();
+      await identity('other');
+      await tester.pumpAndSettle();
+      expect(find.text('Save branches'), findsNothing);
+      expect(find.text('staff@example.test'), findsNothing);
+      expect(repository.assignments, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'Denied assignment clears stale staff and does not display success',
+    (tester) async {
+      final repository = StaffFixture(client)..failAssignment = true;
+      await open(tester, repository);
+      await tester.tap(find.text('Edit branch access'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save branches'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Could not update staff access.'),
+        findsOneWidget,
+      );
+      expect(repository.assignments, isEmpty);
+      expect(find.text('staff@example.test'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'Older schema cannot accidentally submit an empty branch assignment',
+    (tester) async {
+      await open(tester, StaffFixture(client)..oldSchema = true);
+      expect(find.text('Edit branch access'), findsNothing);
+      expect(
+        find.textContaining('Apply the staff branch-access migration'),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

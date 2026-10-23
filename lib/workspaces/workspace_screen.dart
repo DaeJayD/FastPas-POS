@@ -7,10 +7,12 @@ import '../core/fastpas_theme.dart';
 import '../hybrid/hybrid_pos_screen.dart';
 import 'workspace_repository.dart';
 import 'staff_access_screen.dart';
+import 'workspace_account.dart';
 
 class WorkspaceScreen extends StatefulWidget {
-  const WorkspaceScreen({super.key, required this.client});
+  const WorkspaceScreen({super.key, required this.client, this.account});
   final SupabaseClient client;
+  final WorkspaceAccount? account;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -19,6 +21,9 @@ class WorkspaceScreen extends StatefulWidget {
 class _WorkspaceScreenState extends State<WorkspaceScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  late final WorkspaceAccount _account;
+  bool _wasRecovering = false;
   late final WorkspaceRepository _repository = WorkspaceRepository(
     widget.client,
   );
@@ -34,6 +39,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   @override
   void initState() {
     super.initState();
+    _account = widget.account ?? WorkspaceAccount(widget.client);
+    _account.addListener(_accountChanged);
+    _wasRecovering = _account.recoveringPassword;
     _auth = widget.client.auth.onAuthStateChange.listen(
       (event) {
         if (!mounted) return;
@@ -44,7 +52,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           _businesses = [];
           _branches = [];
         });
-        if (event.session != null) unawaited(_reload());
+        if (event.session != null && !_account.recoveringPassword) {
+          unawaited(_reload());
+        }
       },
       onError: (_) {
         if (mounted) {
@@ -54,15 +64,40 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         }
       },
     );
-    if (widget.client.auth.currentSession != null) unawaited(_reload());
+    if (widget.client.auth.currentSession != null &&
+        !_account.recoveringPassword) {
+      unawaited(_reload());
+    }
+  }
+
+  void _accountChanged() {
+    if (!mounted) return;
+    final recovering = _account.recoveringPassword;
+    if (recovering && !_wasRecovering) {
+      _password.clear();
+      _confirmPassword.clear();
+    }
+    _wasRecovering = recovering;
+    setState(() {
+      _message = null;
+      if (recovering) {
+        _generation++;
+        _selected = null;
+        _businesses = [];
+        _branches = [];
+      }
+    });
   }
 
   @override
   void dispose() {
     _generation++;
     _auth?.cancel();
+    _account.removeListener(_accountChanged);
+    if (widget.account == null) _account.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -77,7 +112,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
     try {
       final businesses = await _repository.businesses();
-      if (!mounted || generation != _generation) return;
+      if (!mounted ||
+          generation != _generation ||
+          _account.recoveringPassword) {
+        return;
+      }
       setState(() {
         _businesses = businesses;
         if (_repository.lastReadOffline) {
@@ -101,6 +140,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     });
     try {
       await action();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _message = error.message);
     } on AuthException catch (error) {
       if (mounted) setState(() => _message = error.message);
     } catch (_) {
@@ -359,7 +400,55 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               children: [
                 const FastPasBrand(size: 32),
                 const SizedBox(height: 24),
-                if (!signedIn) ...[
+                if (_account.recoveringPassword) ...[
+                  Text(
+                    'Choose a new password',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const Text(
+                    'Use at least 8 characters. Your businesses and saved sales stay with your account.',
+                  ),
+                  TextField(
+                    controller: _password,
+                    obscureText: true,
+                    autofillHints: const [AutofillHints.newPassword],
+                    decoration: const InputDecoration(
+                      labelText: 'New password',
+                    ),
+                  ),
+                  TextField(
+                    controller: _confirmPassword,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm new password',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() async {
+                            await _account.finishRecovery(
+                              _password.text,
+                              _confirmPassword.text,
+                            );
+                            _password.clear();
+                            _confirmPassword.clear();
+                            await _reload();
+                          }),
+                    child: const Text('Update password'),
+                  ),
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() async {
+                            await _account.cancelRecovery();
+                            _password.clear();
+                            _confirmPassword.clear();
+                          }),
+                    child: const Text('Cancel recovery'),
+                  ),
+                ] else if (!signedIn) ...[
                   Text(
                     _register ? 'Create your account' : 'Welcome back',
                     style: Theme.of(context).textTheme.headlineMedium,
@@ -380,9 +469,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         ? null
                         : () => _run(() async {
                             if (_register) {
-                              await widget.client.auth.signUp(
-                                email: _email.text.trim(),
-                                password: _password.text,
+                              await _account.signUp(
+                                _email.text,
+                                _password.text,
                               );
                               if (mounted) {
                                 setState(
@@ -390,9 +479,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                 );
                               }
                             } else {
-                              await widget.client.auth.signInWithPassword(
-                                email: _email.text.trim(),
-                                password: _password.text,
+                              await _account.signIn(
+                                _email.text,
+                                _password.text,
                               );
                             }
                             _password.clear();
@@ -408,6 +497,32 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                           ? 'Already have an account? Sign in'
                           : 'Create an account',
                     ),
+                  ),
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() async {
+                            await _account.sendPasswordReset(_email.text);
+                            if (mounted) {
+                              setState(
+                                () => _message = 'If the account exists, a reset email has been sent. Open it on this device.',
+                              );
+                            }
+                          }),
+                    child: const Text('Forgot password?'),
+                  ),
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() async {
+                            await _account.resendVerification(_email.text);
+                            if (mounted) {
+                              setState(
+                                () => _message = 'If verification is needed, a fresh email has been sent. Open it on this device.',
+                              );
+                            }
+                          }),
+                    child: const Text('Resend verification email'),
                   ),
                 ] else ...[
                   Text(
@@ -507,10 +622,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   ],
                 ],
                 if (_busy) const LinearProgressIndicator(),
-                if (_message != null)
+                if (_message != null || _account.notice != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
-                    child: Text(_message!),
+                    child: Text(_message ?? _account.notice!),
                   ),
               ],
             ),
