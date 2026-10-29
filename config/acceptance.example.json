@@ -1,0 +1,11 @@
+{
+  "projectUrl": "https://YOUR_PROJECT_REF.supabase.co",
+  "expectedProjectRef": "YOUR_PROJECT_REF",
+  "publicKey": "YOUR_SUPABASE_PUBLISHABLE_KEY",
+  "allowTestWrites": false,
+  "accounts": {
+    "ownerA": { "email": "owner-a@example.test", "password": "REPLACE_LOCALLY" },
+    "ownerB": { "email": "owner-b@example.test", "password": "REPLACE_LOCALLY" },
+    "staff": { "email": "staff@example.test", "password": "REPLACE_LOCALLY" }
+  }
+}
