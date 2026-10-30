@@ -79,3 +79,7 @@ Phase 3 also includes Owner-managed staff branch assignments in a fourth migrati
 Validation on 24 October 2026: all 120 Flutter tests pass serially, full static analysis reports no issues, and all four migrations pass 95 embedded PostgreSQL checks with Auth identity stubbed. Actual Supabase Auth, PostgREST, email, and device acceptance remain pending.
 
 The default Android debug APK rebuilt successfully with the branch editor and placeholder backend configuration. Android and iOS XML parse; iOS compilation is unverified. Native callbacks and offline synchronization still require device acceptance against Supabase.
+
+Hosted acceptance tooling is prepared for Phase 3. The opt-in runner checks real Auth and PostgREST isolation, staff permissions, branch revocation, and cash-sale retry behavior when a disposable development project is configured. It preserves attempted fixture IDs in ignored local reports, waits for concurrent uploads before session cleanup, and fails on missing RPCs or transport errors. See [hosted acceptance](HOSTED_ACCEPTANCE.md) for configuration, retained fixtures, and the remaining device checks. Preparing and locally testing this runner does not complete hosted acceptance or Phase 3.
+
+Local verification on 30 October 2026: all 15 acceptance-tooling tests and all 95 embedded PostgreSQL checks pass. Runner syntax and whitespace checks pass; local credentials, reports, and pending report files are ignored by Git. These results do not exercise a real Supabase API or device callback.

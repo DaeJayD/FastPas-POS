@@ -62,6 +62,8 @@ The explicit `lib/workspaces/main.dart` target launches the same app. `lib/legac
 
 The default workspace Android debug APK builds with placeholder backend configuration. Real Supabase Auth, email links, and multi-device acceptance remain unverified. Android callback declarations are packaged; iOS configuration is present but has not been built on macOS.
 
+The [hosted acceptance runner](docs/HOSTED_ACCEPTANCE.md) is ready for use after a disposable Supabase development project is configured. Its local guard/transport tests run with `node --test supabase/tests/hosted_acceptance.test.mjs`. A real hosted acceptance run remains pending.
+
 The Android build uses Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.21 and Java 17 bytecode. The development baseline is Flutter 3.47.4 / Dart 3.13. Release signing and physical-device validation remain planned.
 
 ## Roadmap

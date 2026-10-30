@@ -51,7 +51,11 @@ The default `lib/main.dart` launches business workspaces and hybrid cash selling
 
 `lib/legacy_main.dart` retains the historical single-store interface for migration development. It requires its old database contract and is not connected to the new project. Attendance, suppliers, advanced inventory, reports, and the complete previous selling UI will move into the workspace flow in later phases.
 
-## 4. First business and acceptance checks
+## 4. Automated hosted acceptance
+
+After setting up the development project, follow [hosted backend acceptance](HOSTED_ACCEPTANCE.md) to check real Auth, PostgREST isolation, staff permissions, and cash-sale retries. The opt-in runner uses three verified test accounts and creates retained fixtures in a disposable project. Credentials and results stay in ignored local configuration files. This run has not yet been performed; it does not replace the device checks below.
+
+## 5. First business and acceptance checks
 
 1. Install on Android, register an Owner account, and verify its email on the same device. Create a business and its first branch. The server creates Owner membership automatically.
 2. Open the branch online. Add a product, a price in PHP, and opening stock. Make a cash sale; confirm the saved receipt and acknowledged sync status.

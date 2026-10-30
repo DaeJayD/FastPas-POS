@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, readFile, readdir, rm, rmdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   AcceptanceError, ApiError, ProjectApi, expectRejection, runAcceptance, validateConfig,
+  concurrentSaleUploads, saveReport,
 } from './hosted_acceptance.mjs';
 
 const configuration = () => ({
@@ -156,4 +160,83 @@ test('CLI refuses the unconfigured example without attempting hosted acceptance'
   assert.equal(result.status, 1);
   assert.match(result.stderr, /allowTestWrites: true/);
   assert.doesNotMatch(result.stdout, /PASS/);
+});
+
+test('concurrent receipt check waits for the other request before propagating failure', async () => {
+  let finishSecond;
+  let calls = 0;
+  const error = new ApiError(403, '42501');
+  const sale = { id: 'stable-receipt' };
+  const api = {
+    rpc(name, args) {
+      assert.equal(name, 'pos_sync_cash_sale');
+      assert.equal(args.sale, sale);
+      calls++;
+      if (calls === 1) return Promise.reject(error);
+      return new Promise(resolve => { finishSecond = resolve; });
+    },
+  };
+  let settled = false;
+  const upload = concurrentSaleUploads(api, sale).finally(() => { settled = true; });
+  const rejection = assert.rejects(upload, result => result === error);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 2);
+  assert.equal(settled, false);
+  finishSecond(sale.id);
+  await rejection;
+  assert.equal(settled, true);
+});
+
+test('concurrent receipt check retains both successful server replies', async () => {
+  const ids = ['first-reply', 'second-reply'];
+  const replies = await concurrentSaleUploads({ rpc: async () => ids.shift() }, { id: 'receipt' });
+  assert.deepEqual(replies, ['first-reply', 'second-reply']);
+});
+
+test('reports replace the previous manifest and leave no pending file after success', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'fastpas-acceptance-report-'));
+  const path = join(directory, 'acceptance-fixture.local.json');
+  const pending = join(directory, 'acceptance-fixture.pending.local.json');
+  try {
+    await saveReport(path, { status: 'running', fixtures: ['first'] });
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), { status: 'running', fixtures: ['first'] });
+    await saveReport(path, { status: 'failed', fixtures: ['first', 'attempted-second'] });
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), { status: 'failed', fixtures: ['first', 'attempted-second'] });
+    assert.deepEqual(await readdir(directory), ['acceptance-fixture.local.json']);
+    await assert.rejects(saveReport(join(directory, 'report.json'), {}), /ignored .local.json/);
+  } finally {
+    await rm(path, { force: true });
+    await rm(pending, { force: true });
+    await rmdir(directory);
+  }
+});
+
+test('missing RPCs identify the failed check and never count as permission denial', async () => {
+  const config = configuration();
+  const userIds = new Map(Object.values(config.accounts).map((account, index) =>
+    [account.email, `10000000-0000-4000-8000-00000000000${index + 1}`]));
+  const tokens = new Map();
+  let lastReport;
+  const fetchImpl = async (url, options) => {
+    if (url.pathname.endsWith('/token')) {
+      const account = JSON.parse(options.body);
+      const token = `private-${userIds.get(account.email)}`;
+      tokens.set(`Bearer ${token}`, account.email);
+      return json({ access_token: token });
+    }
+    if (url.pathname.endsWith('/user')) {
+      const email = tokens.get(options.headers.Authorization);
+      return json({ id: userIds.get(email), role: 'authenticated', email, email_confirmed_at: '2026-10-30T00:00:00Z' });
+    }
+    if (url.pathname.endsWith('/logout')) return new Response(null, { status: 204 });
+    return json({ code: 'PGRST202', message: 'private backend details' }, 404);
+  };
+  await assert.rejects(runAcceptance(config, {
+    writeFixtures: true, fetchImpl, record: async report => { lastReport = structuredClone(report); },
+  }), /Anonymous business creation denied: Expected backend denial was not confirmed/);
+  assert.equal(lastReport.status, 'failed');
+  assert.equal(lastReport.checks.length, 1);
+  assert.equal(lastReport.sessionsClosed, true);
+  assert.deepEqual(lastReport.fixtures.businesses, []);
+  assert.doesNotMatch(JSON.stringify(lastReport), /private backend details|private-password/);
 });

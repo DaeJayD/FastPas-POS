@@ -1,7 +1,7 @@
 // Opt-in checks against a disposable hosted project with real Auth/PostgREST.
 // No admin key, account creation, migration execution, or fixture deletion.
 import { randomUUID } from 'node:crypto';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -117,6 +117,26 @@ export async function expectRejection(action, code, statuses) {
   throw new AcceptanceError('A request that should have been denied succeeded.');
 }
 
+export async function concurrentSaleUploads(api, sale) {
+  // Both requests may already have reached the server. Wait for both before
+  // reporting failure or closing sessions, even when one rejects immediately.
+  const results = await Promise.allSettled([
+    api.rpc('pos_sync_cash_sale', { sale }), api.rpc('pos_sync_cash_sale', { sale }),
+  ]);
+  const failure = results.find(result => result.status === 'rejected');
+  if (failure) throw failure.reason;
+  return results.map(result => result.value);
+}
+
+export async function saveReport(reportPath, report) {
+  requireValue(reportPath.endsWith('.local.json'), 'Acceptance reports must use an ignored .local.json filename.');
+  const pendingPath = reportPath.replace(/\.local\.json$/, '.pending.local.json');
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(pendingPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  // Preserve the previous complete manifest if a write is interrupted.
+  await rename(pendingPath, reportPath);
+}
+
 export async function runAcceptance(raw, {
   writeFixtures = false, fetchImpl = fetch, record = async () => {}, log = () => {},
 } = {}) {
@@ -134,7 +154,8 @@ export async function runAcceptance(raw, {
     log(`PASS ${label}`);
   };
   const denied = async (api, name, args, label, code = '42501', statuses = [401, 403]) => {
-    await expectRejection(() => api.rpc(name, args), code, statuses);
+    try { await expectRejection(() => api.rpc(name, args), code, statuses); }
+    catch (error) { throw new AcceptanceError(`${label}: ${error.message}`); }
     check(true, label);
   };
   const onlyIds = (rows, ids) => Array.isArray(rows) && rows.length === ids.length &&
@@ -220,7 +241,7 @@ export async function runAcceptance(raw, {
     };
     report.fixtures.sales.push(sale.id);
     await record(report);
-    const saleReplies = await Promise.all([staff.rpc('pos_sync_cash_sale', { sale }), staff.rpc('pos_sync_cash_sale', { sale })]);
+    const saleReplies = await concurrentSaleUploads(staff, sale);
     check(saleReplies.every(id => id === sale.id), 'Concurrent identical sale uploads return the same receipt');
     const quantity = async () => {
       const rows = await rowsFor(ownerA, 'pos_item_stock', a.id, 'product_id,quantity');
@@ -287,21 +308,24 @@ async function main() {
   }
   validateConfig(raw, true);
   let reportPath;
-  const report = await runAcceptance(raw, {
-    writeFixtures: true, log: console.log,
-    record: async result => {
-      reportPath ??= resolve('config', `acceptance-${result.runId}.local.json`);
-      await mkdir(dirname(reportPath), { recursive: true });
-      await writeFile(reportPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
-    },
-  });
-  console.log(`Hosted acceptance passed: ${report.checks.length} checks. Fixtures retained; report: ${reportPath}`);
+  try {
+    const report = await runAcceptance(raw, {
+      writeFixtures: true, log: console.log,
+      record: async result => {
+        const target = reportPath ?? resolve('config', `acceptance-${result.runId}.local.json`);
+        await saveReport(target, result);
+        reportPath = target;
+      },
+    });
+    console.log(`Hosted acceptance passed: ${report.checks.length} checks. Fixtures retained.`);
+  } finally {
+    if (reportPath) console.log(`Acceptance report: ${reportPath}`);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(error => {
     console.error(error instanceof AcceptanceError ? error.message : 'Local runner failed; no hosted result is assumed.');
-    console.error('Inspect the ignored config/acceptance-*.local.json report for attempted fixture IDs.');
     process.exitCode = 1;
   });
 }
