@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/pos_form_dialog.dart';
+import '../core/fastpas_theme.dart';
 import '../workspaces/workspace_repository.dart';
 import 'cash_rules.dart';
 import 'local_store.dart';
@@ -36,6 +38,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
   late final String? _userId;
   Future<void>? _operation;
   List<Map<String, Object?>> _products = [], _receipts = [];
+  Map<String, int> _prices = {};
   final _cart = <String, int>{};
   bool _busy = true;
   bool _syncing = false;
@@ -53,6 +56,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
           setState(() {
             _products = [];
             _receipts = [];
+            _prices = {};
             _cart.clear();
             _allowed = false;
             _status = 'Account changed. Return to your businesses.';
@@ -108,6 +112,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
       setState(() {
         _products = products;
         _receipts = receipts;
+        _prices = {
+          for (final p in products) p['id'] as String: p['price_cents'] as int,
+        };
         _allowed = allowed;
       });
     }
@@ -133,7 +140,11 @@ class _HybridPosScreenState extends State<HybridPosScreen>
       if (widget.synchronize != null) {
         await widget.synchronize!(_store!);
       } else {
-        await SyncService(widget.client, _store!).synchronize();
+        await SyncService(
+          widget.client,
+          _store!,
+          isActive: () => mounted,
+        ).synchronize();
       }
       if (mounted) setState(() => _status = 'Connected · changes synchronized');
     } catch (_) {
@@ -141,7 +152,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
         setState(() => _status = 'Not synchronized · using saved data');
       }
     } finally {
-      await _load();
+      if (mounted) await _load();
       if (mounted) setState(() => _syncing = false);
     }
   }
@@ -165,61 +176,38 @@ class _HybridPosScreenState extends State<HybridPosScreen>
     super.dispose();
   }
 
-  int get _total => _products.fold(
+  int get _total => _cart.entries.fold(
     0,
-    (sum, p) => sum + (p['price_cents'] as int) * (_cart[p['id']] ?? 0),
+    (sum, entry) => sum + (_prices[entry.key] ?? 0) * entry.value,
   );
 
-  Future<Map<String, String>?> _form(
-    String title,
-    Map<String, String> fields,
-  ) async {
-    final controllers = fields.map(
-      (key, value) => MapEntry(key, TextEditingController(text: value)),
-    );
+  Future<void> _checkout() async {
+    if (_busy || !_allowed || _cart.isEmpty) return;
+    final totalDue = _total;
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final entry in controllers.entries)
-                TextField(
-                  controller: entry.value,
-                  decoration: InputDecoration(labelText: entry.key),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(
-              context,
-              controllers.map((k, v) => MapEntry(k, v.text)),
-            ),
-            child: const Text('Save'),
+      builder: (_) => PosFormDialog(
+        title: 'Cash payment',
+        description:
+            'Total due ${displayCents(totalDue)}. Exact cash is prefilled.',
+        fields: [
+          PosFormField(
+            label: 'Cash received',
+            initialValue: (totalDue / 100).toStringAsFixed(2),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (value) {
+              try {
+                return parseCents(value ?? '') < totalDue
+                    ? 'Cash must cover the total due.'
+                    : null;
+              } on FormatException catch (error) {
+                return error.message;
+              }
+            },
           ),
         ],
       ),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    for (final controller in controllers.values) {
-      controller.dispose();
-    }
-    return result;
-  }
-
-  Future<void> _checkout() async {
-    if (_busy || !_allowed || _cart.isEmpty) return;
-    final result = await _form('Cash payment', {
-      'Cash received': (_total / 100).toStringAsFixed(2),
-    });
     if (result == null || !mounted) return;
     setState(() => _busy = true);
     try {
@@ -228,9 +216,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
       }
       final cash = parseCents(result['Cash received']!);
       final id = await _store!.checkout(Map.of(_cart), cash);
-      final saved = (await _store!.receipts()).firstWhere(
-        (row) => row['id'] == id,
-      );
+      final saved = await _store!.receipt(id);
       final total = saved['total_cents'] as int;
       _cart.clear();
       await _load();
@@ -264,13 +250,58 @@ class _HybridPosScreenState extends State<HybridPosScreen>
   }
 
   Future<void> _addProduct() async {
-    final result = await _form('Add product · online', {
-      'Name': '',
-      'SKU': '',
-      'Price': '',
-      'Opening stock': '0',
-    });
-    if (result == null || !mounted) return;
+    if (_busy || widget.client.auth.currentUser?.id != _userId) return;
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (_) => PosFormDialog(
+        title: 'Add product · online',
+        fields: [
+          PosFormField(
+            label: 'Name',
+            validator: (value) =>
+                (value ?? '').trim().isEmpty || value!.trim().length > 120
+                ? 'Enter a name between 1 and 120 characters.'
+                : null,
+          ),
+          PosFormField(
+            label: 'SKU',
+            validator: (value) =>
+                (value ?? '').trim().isEmpty || value!.trim().length > 80
+                ? 'Enter a SKU between 1 and 80 characters.'
+                : null,
+          ),
+          PosFormField(
+            label: 'Price',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (value) {
+              try {
+                return parseCents(value ?? '') > 1000000000
+                    ? 'Maximum price is ₱10,000,000.00.'
+                    : null;
+              } on FormatException catch (error) {
+                return error.message;
+              }
+            },
+          ),
+          PosFormField(
+            label: 'Opening stock',
+            initialValue: '0',
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              final quantity = int.tryParse((value ?? '').trim());
+              return quantity == null || quantity < 0 || quantity > 2147483647
+                  ? 'Enter a whole quantity from 0 to 2147483647.'
+                  : null;
+            },
+          ),
+        ],
+      ),
+    );
+    if (result == null ||
+        !mounted ||
+        widget.client.auth.currentUser?.id != _userId) {
+      return;
+    }
     setState(() => _busy = true);
     try {
       await widget.client.rpc(
@@ -300,11 +331,18 @@ class _HybridPosScreenState extends State<HybridPosScreen>
   Widget build(BuildContext context) {
     final pending = _receipts.where((r) => r['status'] == 'pending').length;
     final blocked = _receipts.where((r) => r['status'] == 'blocked').length;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 160);
     return PopScope(
-      canPop: !_busy && !_syncing,
+      canPop: !_busy,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${widget.business.name} · ${widget.branch.name}'),
+          title: Text(
+            '${widget.business.name} · ${widget.branch.name}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           actions: [
             IconButton(
               onPressed: _busy || _syncing ? null : _startSync,
@@ -314,77 +352,198 @@ class _HybridPosScreenState extends State<HybridPosScreen>
           ],
         ),
         body: SafeArea(
-          child: ListView(
+          child: ListView.builder(
             padding: const EdgeInsets.all(20),
-            children: [
-              Text(_status),
-              Text('$pending pending · $blocked need review'),
-              if (!_allowed)
-                const Text(
-                  'Connect to verify selling access. Offline access lasts up to 24 hours after verification.',
-                ),
-              if (_busy || _syncing) const LinearProgressIndicator(),
-              const SizedBox(height: 12),
-              if (widget.business.role == 'owner')
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _addProduct,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add product'),
-                ),
-              if (_products.isEmpty)
-                const Text(
-                  'Connect to download products, or add your first product.',
-                ),
-              for (final p in _products)
-                Card(
-                  child: ListTile(
-                    title: Text(p['name'] as String),
-                    subtitle: Text(
-                      '${p['sku']} · ${displayCents(p['price_cents'] as int)} · ${p['quantity']} locally available',
+            itemCount: _products.length + _receipts.length + 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Volt.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Volt.line),
+                      ),
+                      child: Row(
+                        children: [
+                          AnimatedContainer(
+                            duration: motion,
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _syncing
+                                  ? Colors.amber.shade700
+                                  : (_allowed
+                                        ? Colors.teal.shade700
+                                        : Volt.muted),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _status,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$pending pending · $blocked need review',
+                                  style: const TextStyle(color: Volt.muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    const SizedBox(height: 12),
+                    if (!_allowed)
+                      const Text(
+                        'Connect to verify selling access. Offline access lasts up to 24 hours after verification.',
+                      ),
+                    if (_busy || _syncing) const LinearProgressIndicator(),
+                    const SizedBox(height: 12),
+                    if (widget.business.role == 'owner')
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : _addProduct,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add product'),
+                      ),
+                    const SizedBox(height: 12),
+                    if (_products.isEmpty)
+                      const Text(
+                        'Connect to download products, or add your first product.',
+                      ),
+                  ],
+                );
+              }
+              if (index <= _products.length) {
+                final p = _products[index - 1];
+                final quantity = _cart[p['id']] ?? 0;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: BorderSide(
+                      color: quantity > 0 ? Volt.ink : Volt.line,
+                    ),
+                  ),
+                  child: AnimatedContainer(
+                    duration: motion,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      color: quantity > 0
+                          ? Volt.lime.withValues(alpha: .08)
+                          : Volt.surface,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        IconButton(
-                          tooltip: 'Remove one',
-                          onPressed: _busy || (_cart[p['id']] ?? 0) == 0
-                              ? null
-                              : () => setState(() {
-                                  final id = p['id'] as String;
-                                  if (_cart[id] == 1) {
-                                    _cart.remove(id);
-                                  } else {
-                                    _cart[id] = _cart[id]! - 1;
-                                  }
-                                }),
-                          icon: const Icon(Icons.remove),
+                        Text(
+                          p['name'] as String,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        Text('${_cart[p['id']] ?? 0}'),
-                        IconButton(
-                          tooltip: 'Add one',
-                          onPressed:
-                              _busy ||
-                                  !_allowed ||
-                                  (_cart[p['id']] ?? 0) >=
-                                      (p['quantity'] as int)
-                              ? null
-                              : () => setState(() {
-                                  final id = p['id'] as String;
-                                  _cart[id] = (_cart[id] ?? 0) + 1;
-                                }),
-                          icon: const Icon(Icons.add),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              p['sku'] as String,
+                              style: const TextStyle(color: Volt.muted),
+                            ),
+                            Text(
+                              displayCents(p['price_cents'] as int),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${p['quantity']} locally available',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Remove one',
+                                  onPressed: _busy || (_cart[p['id']] ?? 0) == 0
+                                      ? null
+                                      : () => setState(() {
+                                          final id = p['id'] as String;
+                                          if (_cart[id] == 1) {
+                                            _cart.remove(id);
+                                          } else {
+                                            _cart[id] = _cart[id]! - 1;
+                                          }
+                                        }),
+                                  icon: const Icon(Icons.remove),
+                                ),
+                                AnimatedSwitcher(
+                                  duration: motion,
+                                  child: Text(
+                                    '$quantity',
+                                    key: ValueKey(quantity),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Add one',
+                                  onPressed:
+                                      _busy ||
+                                          !_allowed ||
+                                          (_cart[p['id']] ?? 0) >=
+                                              (p['quantity'] as int)
+                                      ? null
+                                      : () => setState(() {
+                                          final id = p['id'] as String;
+                                          _cart[id] = (_cart[id] ?? 0) + 1;
+                                        }),
+                                  icon: const Icon(Icons.add),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                ),
-              const SizedBox(height: 20),
-              Text(
-                'Saved receipts',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              for (final receipt in _receipts)
-                ListTile(
+                );
+              }
+              final receiptIndex = index - _products.length - 2;
+              if (receiptIndex < 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 12),
+                  child: Text(
+                    'Saved receipts',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                );
+              }
+              final receipt = _receipts[receiptIndex];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
                   title: Text(
                     '${displayCents(receipt['total_cents'] as int)} · ${receipt['status']}',
                   ),
@@ -416,15 +575,17 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                     );
                   },
                 ),
-            ],
+              );
+            },
           ),
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: FilledButton(
+            child: FilledButton.icon(
               onPressed: _busy || !_allowed || _cart.isEmpty ? null : _checkout,
-              child: Text('Cash checkout · ${displayCents(_total)}'),
+              icon: const Icon(Icons.shopping_bag_outlined, size: 20),
+              label: Text('Cash checkout · ${displayCents(_total)}'),
             ),
           ),
         ),

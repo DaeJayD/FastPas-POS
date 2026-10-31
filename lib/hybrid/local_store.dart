@@ -28,6 +28,9 @@ class LocalStore {
     final db = await backend.openDatabase(
       path.join(root, 'pos-$userId-$businessId-$branchId.db'),
       options: OpenDatabaseOptions(
+        // A previous route may finish an upload after this branch is reopened.
+        // Each visit owns its connection; closing one must not close another.
+        singleInstance: false,
         version: 1,
         onCreate: (db, _) async {
           await db.execute(
@@ -65,6 +68,20 @@ class LocalStore {
       db.query('products', orderBy: 'name');
   Future<List<Map<String, Object?>>> receipts() =>
       db.query('sales', orderBy: 'rowid DESC');
+
+  Future<List<Map<String, Object?>>> pendingReceipts() => db.query(
+    'sales',
+    where: 'status = ?',
+    whereArgs: ['pending'],
+    orderBy: 'rowid',
+  );
+
+  Future<Map<String, Object?>> receipt(String id) async => (await db.query(
+    'sales',
+    where: 'id = ?',
+    whereArgs: [id],
+    limit: 1,
+  )).single;
 
   Future<void> replaceSnapshot(
     List<Map<String, Object?>> products,

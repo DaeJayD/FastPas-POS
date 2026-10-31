@@ -8,6 +8,8 @@ The normal entry point is `lib/main.dart`, which delegates to the business works
 
 The staged branch flow uses `hybrid/local_store.dart` for scoped SQLite persistence and atomic local cash checkout, `hybrid/sync_service.dart` for permission checks and durable upload processing, and `hybrid/hybrid_pos_screen.dart` for cash selling and sync status. The additive cash-sale migration supplies server transactions. See [hybrid operation](HYBRID.md) for the offline access window, shortage policy, and remaining features.
 
+`core/pos_form_dialog.dart` owns product/payment form controllers and inline validation for the full dialog lifetime. The branch route allows navigation during background reads/uploads, stops subsequent sync work after disposal, and waits for in-flight work before closing its independently owned SQLite connection. Independent cloud access reads overlap; the final account and permission checks still gate catalog enrollment. Product/receipt widgets are built on demand by the scrolling list.
+
 | Area | Responsibility |
 |---|---|
 | `auth/employee_login_repository.dart` | Isolate the existing sign-in contract until the identity migration |

@@ -18,6 +18,8 @@ Owners can now change an employee's branch assignments while retaining membershi
 
 Sync runs on opening the branch, app resume, every 30 seconds while open, and Sync now. It does not block cash checkout and is not a guaranteed OS background job after closing the app. Requests have bounded timeouts. Lost responses retry the same receipt UUID and payload; the server atomically saves each sale and deducts stock once.
 
+The current Saved receipts list reads the local account/branch database. It does not download receipt history from other devices. Other enrolled devices refresh catalog and stock from the server; shared receipt reporting remains planned.
+
 The server rechecks business membership, role, branch access, catalog prices, and product ownership. Network failures remain pending. Validation failures retain the receipt and display a review reason. A resolution/reversal workflow is still required before pilot use. Catalog refresh preserves pending and blocked stock deductions without deducting acknowledged sales twice. Reads paginate the catalog.
 
 Local stock checks cannot prevent two disconnected devices selling the same remaining units. The staged server accepts completed cash sales and retains negative stock for explicit shortage reconciliation. Stock allocations and configurable online-only items remain planned. Database sync never verifies a card or wallet payment.

@@ -79,4 +79,4 @@ git check-ignore config/acceptance.local.json config/acceptance-RUN_UUID.local.j
 
 ## Phase 3 completion boundary
 
-Keep hosted acceptance pending until the actual project run succeeds and its report is reviewed. Then perform the Android email-verification and password-recovery callback checks and the two-device outage/reconnect checks in [fresh setup](SETUP.md). Embedded tests, runner unit tests, a browser sample, or an APK build do not replace these checks. Do not mark Phase 3 complete solely because the acceptance tooling exists.
+Keep hosted acceptance pending until the actual project run succeeds and its report is reviewed. Then perform the Android email-verification and password-recovery callback checks and the two-device outage/reconnect checks in the [device acceptance checklist](DEVICE_ACCEPTANCE.md). Embedded tests, runner unit tests, a browser sample, or an APK build do not replace these checks. Do not mark Phase 3 complete solely because the acceptance tooling exists.

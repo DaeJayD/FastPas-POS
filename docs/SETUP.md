@@ -59,6 +59,8 @@ After setting up the development project, follow [hosted backend acceptance](HOS
 
 ## 5. First business and acceptance checks
 
+Use the [device acceptance checklist](DEVICE_ACCEPTANCE.md) for installation, repeatable stock quantities, account checks, and recording results.
+
 1. Install on Android, register an Owner account, and verify its email on the same device. Create a business and its first branch. The server creates Owner membership automatically.
 2. Open the branch online. Add a product, a price in PHP, and opening stock. Make a cash sale; confirm the saved receipt and acknowledged sync status.
 3. Disconnect, sell another item, close and reopen the app, and check that the receipt remains pending. Reconnect and sync. Confirm that the cloud receives it once and stock changes once.

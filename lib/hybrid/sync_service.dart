@@ -7,12 +7,16 @@ import 'local_store.dart';
 
 /// Bound to one immutable user/business/branch context for its entire lifetime.
 class SyncService {
-  SyncService(this.client, this.store);
+  SyncService(this.client, this.store, {this.isActive});
   final SupabaseClient client;
   final LocalStore store;
+  final bool Function()? isActive;
   bool _running = false;
 
   void _checkIdentity() {
+    if (isActive?.call() == false) {
+      throw StateError('Store was closed. Pending records are retained.');
+    }
     if (client.auth.currentUser?.id != store.userId) {
       throw StateError('Sign in with the account that created these sales.');
     }
@@ -23,8 +27,7 @@ class SyncService {
     _running = true;
     try {
       await _verifiedRole();
-      for (final row in await store.receipts()) {
-        if (row['status'] != 'pending') continue;
+      for (final row in await store.pendingReceipts()) {
         _checkIdentity();
         final payload =
             jsonDecode(row['payload'] as String) as Map<String, dynamic>;
@@ -63,20 +66,24 @@ class SyncService {
 
   Future<String> _verifiedRole() async {
     _checkIdentity();
-    final membership = await client
-        .from('pos_memberships')
-        .select('role')
-        .eq('business_id', store.businessId)
-        .eq('user_id', store.userId)
-        .maybeSingle()
-        .timeout(const Duration(seconds: 8));
-    final branch = await client
-        .from('pos_branches')
-        .select('id')
-        .eq('business_id', store.businessId)
-        .eq('id', store.branchId)
-        .maybeSingle()
-        .timeout(const Duration(seconds: 8));
+    final access = await Future.wait([
+      client
+          .from('pos_memberships')
+          .select('role')
+          .eq('business_id', store.businessId)
+          .eq('user_id', store.userId)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8)),
+      client
+          .from('pos_branches')
+          .select('id')
+          .eq('business_id', store.businessId)
+          .eq('id', store.branchId)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8)),
+    ]);
+    _checkIdentity();
+    final membership = access[0], branch = access[1];
     if (membership == null || branch == null) {
       await store.setMeta('revoked', 'true');
       throw StateError(

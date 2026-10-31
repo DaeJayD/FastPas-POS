@@ -47,6 +47,18 @@ void main() {
     }
   });
   test(
+    'Closing a previous branch visit does not close a reopened store',
+    () async {
+      final reopened = await open();
+      try {
+        await store.close();
+        expect((await reopened.products()).single['id'], 'p1');
+      } finally {
+        await reopened.close();
+      }
+    },
+  );
+  test(
     'Checkout atomically saves receipt, outbox, stock and fixed scope',
     () async {
       final id = await store.checkout({'p1': 2}, 3000, now: verified);

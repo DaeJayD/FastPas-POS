@@ -193,6 +193,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       labelText: 'Business name',
                     ),
                   ),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: branch,
                     maxLength: 120,
@@ -304,6 +305,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(labelText: 'Staff email'),
                 ),
+                const SizedBox(height: 18),
                 DropdownButton<String>(
                   value: role,
                   isExpanded: true,
@@ -408,6 +410,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   const Text(
                     'Use at least 8 characters. Your businesses and saved sales stay with your account.',
                   ),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: _password,
                     obscureText: true,
@@ -416,6 +419,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       labelText: 'New password',
                     ),
                   ),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: _confirmPassword,
                     obscureText: true,
@@ -453,11 +457,13 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     _register ? 'Create your account' : 'Welcome back',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(labelText: 'Email'),
                   ),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: _password,
                     obscureText: true,
@@ -554,6 +560,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   ),
                   for (final business in _businesses)
                     Card(
+                      margin: const EdgeInsets.only(top: 12),
                       child: ListTile(
                         title: Text(business.name),
                         subtitle: Text(business.role),

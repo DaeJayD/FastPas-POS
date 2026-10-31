@@ -80,18 +80,20 @@ class WorkspaceRepository {
     final rows = await _cachedRead('businesses', () async {
       final user = client.auth.currentUser;
       if (user == null) return [];
-      final memberships = await client
-          .from('pos_memberships')
-          .select('business_id,role')
-          .eq('user_id', user.id);
+      // Both reads are scoped by RLS and independent; avoid a second network wait.
+      final results = await Future.wait([
+        client
+            .from('pos_memberships')
+            .select('business_id,role')
+            .eq('user_id', user.id),
+        client.from('pos_businesses').select('id,name').order('name'),
+      ]);
+      final memberships = results[0];
       final roles = {
         for (final row in memberships)
           row['business_id'] as String: row['role'] as String,
       };
-      final rows = await client
-          .from('pos_businesses')
-          .select('id,name')
-          .order('name');
+      final rows = results[1];
       return rows
           .map((row) => {...row, 'role': roles[row['id']] ?? 'employee'})
           .toList();

@@ -3,18 +3,21 @@ import 'package:flutter/material.dart';
 abstract final class Volt {
   static const ink = Color(0xFF202528);
   static const lime = Color(0xFFCEF54A);
-  static const background = Color(0xFFFAFAFA);
-  static const line = Color(0xFFE7E9EB);
-  static const muted = Color(0xFF697178);
-  static const soft = Color(0xFFF0F2F3);
+  static const background = Color(0xFFEDF0F2);
+  static const line = Color(0xFFD6DEE2);
+  static const muted = Color(0xFF5D6870);
+  static const soft = Color(0xFFE5EBEE);
+  static const surface = Color(0xFFF9FAFB);
 
-  static ThemeData get theme {
+  static final ThemeData theme = _buildTheme();
+
+  static ThemeData _buildTheme() {
     final scheme = ColorScheme.fromSeed(seedColor: ink).copyWith(
       primary: ink,
       onPrimary: Colors.white,
       secondary: lime,
       onSecondary: ink,
-      surface: Colors.white,
+      surface: surface,
       onSurface: ink,
       outline: muted,
       outlineVariant: line,
@@ -24,6 +27,7 @@ abstract final class Volt {
       borderSide: const BorderSide(color: line),
     );
     return ThemeData(
+      fontFamily: 'Roboto',
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
@@ -35,18 +39,35 @@ abstract final class Volt {
         centerTitle: false,
         elevation: 0,
         titleTextStyle: TextStyle(
+          fontFamily: 'Roboto',
           color: ink,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
           side: const BorderSide(color: line),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: line),
+        ),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Roboto',
+          color: ink,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -68,7 +89,21 @@ abstract final class Volt {
           backgroundColor: lime,
           foregroundColor: ink,
           minimumSize: const Size(48, 52),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: ink,
+          minimumSize: const Size(48, 48),
+          side: const BorderSide(color: line),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

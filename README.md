@@ -58,7 +58,7 @@ The explicit `lib/workspaces/main.dart` target launches the same app. `lib/legac
 
 ## Validation
 
-`flutter analyze` is clean. All 120 unit and widget tests pass, including local SQLite persistence, offline cash checkout, upload retries, account isolation, SDK account recovery, staff branch reassignment, and existing selling/management regressions. The four additive database migrations pass 95 embedded PostgreSQL checks with Auth identity stubbed. The earlier sample sale and branch navigation emulator check covers the Phase 2 sample flow, not this new backend. Build results and remaining acceptance checks are recorded in the roadmap.
+`flutter analyze` is clean. All 127 unit and widget tests pass, including local SQLite persistence, offline cash checkout, upload retries, account isolation, SDK account recovery, staff branch reassignment, phone dialog layout, navigation during sync, reopened-store connections, and existing selling/management regressions. The four additive database migrations pass 95 embedded PostgreSQL checks with Auth identity stubbed. The earlier sample sale and branch navigation emulator check covers the Phase 2 sample flow, not this new backend. Build results and remaining acceptance checks are recorded in the roadmap.
 
 The default workspace Android debug APK builds. The ignored local configuration now points to the development backend using its public client key. Hosted Auth settings and anonymous API-denial checks pass; real-account sign-in, email links, and multi-device acceptance remain unverified. Android callback declarations are packaged; iOS configuration is present but has not been built on macOS.
 

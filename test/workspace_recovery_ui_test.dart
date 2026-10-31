@@ -54,15 +54,23 @@ void main() {
         expect(find.text('Choose a new password'), findsOneWidget);
         expect(find.text('Your businesses'), findsNothing);
         expect(fixture.calls('/pos_businesses'), isEmpty);
-        await tester.enterText(find.byType(TextField).at(0), 'password1');
-        await tester.enterText(find.byType(TextField).at(1), 'different');
+        final password = find.widgetWithText(TextField, 'New password');
+        final confirmation = find.widgetWithText(
+          TextField,
+          'Confirm new password',
+        );
+        await reveal(tester, password);
+        await tester.enterText(password, 'password1');
+        await reveal(tester, confirmation);
+        await tester.enterText(confirmation, 'different');
         await reveal(tester, find.text('Update password'));
         await tester.tap(find.text('Update password'));
         await tester.pumpAndSettle();
         await reveal(tester, find.text('The passwords do not match.'));
         expect(find.text('The passwords do not match.'), findsOneWidget);
         expect(fixture.calls('/user'), isEmpty);
-        await tester.enterText(find.byType(TextField).at(1), 'password1');
+        await reveal(tester, confirmation);
+        await tester.enterText(confirmation, 'password1');
         await reveal(tester, find.text('Update password'));
         await tester.tap(find.text('Update password'));
         await tester.pumpAndSettle();
