@@ -1,10 +1,10 @@
 # Database contracts
 
-New installations use the four migrations under `supabase/migrations`, starting with business workspaces, then hybrid cash sales, staff access, and staff branch assignments. Follow [fresh setup](SETUP.md). There is no existing Supabase database to migrate for the current setup. A legacy export is needed only if old records are imported later.
+New installations use the four migrations under `supabase/migrations`, starting with business workspaces, then hybrid cash sales, staff access, and staff branch assignments. Follow [fresh setup](SETUP.md). The current development database was provisioned with these four migrations without importing legacy records. A legacy export is needed only if old records are imported later.
 
 ## Legacy source inventory
 
-This inventory is inferred from legacy application queries. The additive workspace migration under `supabase/migrations` defines the new business foundation, not the legacy schema. Legacy database types, constraints, indexes, triggers, grants, row policies, and production contents have not been verified. No remote migration has run.
+This inventory is inferred from legacy application queries. The additive workspace migration under `supabase/migrations` defines the new business foundation, not the legacy schema. Legacy database types, constraints, indexes, triggers, grants, row policies, and production contents have not been verified. No legacy data migration has run; the four new workspace migrations are deployed to the development project.
 
 | Relation | Fields referenced by the app | Current purpose |
 |---|---|---|

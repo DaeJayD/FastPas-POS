@@ -24,10 +24,10 @@ Local stock checks cannot prevent two disconnected devices selling the same rema
 
 ## Remaining release gates
 
-Attendance, reports across devices, suppliers, files, and calendar synchronization remain planned. Local Supabase, real email authentication, two-device airplane-mode/restart acceptance, server deployment, and independent backup restoration have not run. Any future old-record import requires migration rehearsal. Local database encryption is not implemented. Do not clear app data with pending receipts.
+Attendance, reports across devices, suppliers, files, and calendar synchronization remain planned. Local Supabase, real email authentication, two-device airplane-mode/restart acceptance, production deployment, and independent backup restoration have not run. The development schema is deployed, with schema/grant readback and anonymous endpoint checks completed. Any future old-record import requires migration rehearsal. Local database encryption is not implemented. Do not clear app data with pending receipts.
 
 Tests use real SQLite files, mocked HTTP transport, and embedded PostgreSQL with Auth identity stubbed. These are separate from device and deployed-backend acceptance.
 
-The default workspace Android debug APK builds with storage plugins, staff controls, and account recovery using placeholder backend configuration. The sample preview's earlier emulator checks do not validate this new hybrid backend or its offline authentication on a device. The SQL migrations remain unapplied remotely.
+The default workspace Android debug APK builds with storage plugins, staff controls, and account recovery. Its ignored local configuration now targets the development backend. The sample preview's earlier emulator checks do not validate this new hybrid backend or its offline authentication on a device. All four SQL migrations are applied remotely to the development project; the authenticated and two-device acceptance checks remain pending.
 
 Verification on 24 October 2026: all 120 Flutter tests pass serially, static analysis is clean, and all 95 embedded PostgreSQL checks pass. Branch-only revocation, receipt preservation, and uploading the original receipt after access restoration are now covered. The default Android debug APK rebuilt with placeholder backend values and the branch editor. Hosted backend and device acceptance remain separate outstanding checks.

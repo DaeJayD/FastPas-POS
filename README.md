@@ -6,7 +6,7 @@ The name combines **fast** and **paspas**, a Cebuano word associated with speed.
 
 ## Project status
 
-**Work in progress.** The default app now uses Supabase Auth, owner-created business workspaces, staff permissions, and hybrid cash selling. A fresh Supabase project still needs to be configured and tested. The Graphite Volt redesign covers the previous selling and management screens; those remain available through a separate legacy entry point while their features move to the new business-scoped contract. AI features remain planned. The application is not ready for live store use.
+**Work in progress.** The default app now uses Supabase Auth, owner-created business workspaces, staff permissions, and hybrid cash selling. A development Supabase project is configured with all four migrations; real-account and device acceptance remain pending. The Graphite Volt redesign covers the previous selling and management screens; those remain available through a separate legacy entry point while their features move to the new business-scoped contract. AI features remain planned. The application is not ready for live store use.
 
 The legacy interface includes:
 
@@ -60,9 +60,9 @@ The explicit `lib/workspaces/main.dart` target launches the same app. `lib/legac
 
 `flutter analyze` is clean. All 120 unit and widget tests pass, including local SQLite persistence, offline cash checkout, upload retries, account isolation, SDK account recovery, staff branch reassignment, and existing selling/management regressions. The four additive database migrations pass 95 embedded PostgreSQL checks with Auth identity stubbed. The earlier sample sale and branch navigation emulator check covers the Phase 2 sample flow, not this new backend. Build results and remaining acceptance checks are recorded in the roadmap.
 
-The default workspace Android debug APK builds with placeholder backend configuration. Real Supabase Auth, email links, and multi-device acceptance remain unverified. Android callback declarations are packaged; iOS configuration is present but has not been built on macOS.
+The default workspace Android debug APK builds. The ignored local configuration now points to the development backend using its public client key. Hosted Auth settings and anonymous API-denial checks pass; real-account sign-in, email links, and multi-device acceptance remain unverified. Android callback declarations are packaged; iOS configuration is present but has not been built on macOS.
 
-The [hosted acceptance runner](docs/HOSTED_ACCEPTANCE.md) is ready for use after a disposable Supabase development project is configured. Its local guard/transport tests run with `node --test supabase/tests/hosted_acceptance.test.mjs`. A real hosted acceptance run remains pending.
+The [hosted acceptance runner](docs/HOSTED_ACCEPTANCE.md) is ready for use after three verified test accounts are supplied for the development project. Its local guard/transport tests run with `node --test supabase/tests/hosted_acceptance.test.mjs`. The three-account hosted acceptance run remains pending.
 
 The Android build uses Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.21 and Java 17 bytecode. The development baseline is Flutter 3.47.4 / Dart 3.13. Release signing and physical-device validation remain planned.
 

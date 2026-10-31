@@ -15,6 +15,8 @@ Each file has its own transaction. They create the new `pos_*` tables and functi
 
 If the first three migrations are already installed, apply only the fourth. It adds branch reassignment and extends the Owner's staff listing; it preserves memberships and sales.
 
+The current development project already has all four migrations applied through the SQL Editor. Do not rerun them there. Manual SQL execution does not populate the CLI migration history; before switching that project to CLI deployment, compare its history and mark the verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). Repairing history records versions without re-executing the schema changes. New projects still follow the four-file sequence above.
+
 Keep `public` exposed through the Data API. Keep `fastpas_private` out of exposed schemas. Leave row-level security and the grants installed by the migrations in place. Business ownership is created through the app, using the authenticated account.
 
 ## 2. Configure accounts and email

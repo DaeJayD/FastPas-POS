@@ -31,7 +31,7 @@ Business creation, invitation acceptance, and initial catalog enrollment require
 
 ## Current limits
 
-Foundation files are not proof of production tenant isolation. No Supabase project has been set up for this work and no remote migration has run. The default workspace app has hybrid cash selling; wider retail feature integration remains incomplete. Old-record migration is conditional on a future import.
+Foundation files are not proof of production tenant isolation. All four migrations are now deployed to a development Supabase project. Live schema/grant readback and anonymous API-denial checks pass, while the three-account hosted acceptance run remains pending. The default workspace app has hybrid cash selling; wider retail feature integration remains incomplete. Old-record migration is conditional on a future import.
 
 ## Validation
 
@@ -43,7 +43,7 @@ To reproduce without adding JavaScript dependencies to the Flutter project, inst
 node supabase/tests/workspaces.test.mjs /absolute/path/to/pglite/dist/index.js
 ```
 
-Local Supabase integration and hosted acceptance remain unverified. Follow the fresh setup instructions to provision the new contract before testing with real Auth, PostgREST, and email delivery.
+Local Supabase integration and full hosted acceptance remain unverified. The development contract is provisioned; follow [hosted acceptance](HOSTED_ACCEPTANCE.md) with three verified test accounts to exercise authenticated allow/deny behavior. Real email delivery and device callbacks remain separate checks.
 
 The onboarding form passes phone/tablet widget checks at 360 and 1024 logical pixels with 130% text. Static analysis of the new client is clean. These checks do not validate real account registration, email verification, or a running backend.
 
