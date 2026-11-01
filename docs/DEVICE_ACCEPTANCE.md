@@ -1,4 +1,4 @@
-# Phase 3 device acceptance
+# Workspace device acceptance
 
 Phase 3 stays open until hosted account isolation and the device checks below pass. Use the development project and test transactions. Record the device, Android version, app build, date, and observed result for each check. An APK build or a unit test is separate evidence.
 
@@ -57,6 +57,23 @@ For the UI revision, also check Add product and Cash payment with the keyboard o
 Do not clear app data, uninstall, or change device time to shortcut a persistence or expiry check. Do not use real customer data or payments. A disconnected device cannot receive an access revocation until it reconnects; assess offline operation within the documented authorization window.
 
 Saved receipts currently belong to the local account/branch database on the device that recorded them. Synchronization uploads receipts and refreshes catalog/stock; it does not download other devices' receipt history into this screen. Shared reporting remains a later phase.
+
+## Phase 4 business settings checks
+
+The Phase 4 profile APK rebuilt on 1 November 2026. Install the current `app-profile.apk` as an update with existing app data retained. The fifth migration is already applied to the development project; do not rerun it. All ten deployed-schema/grant/data-count checks passed. The following installed-app checks remain pending:
+
+| Check | Action | Pass condition |
+|---|---|---|
+| Owner details | Open **Business settings**, change test business/contact/footer values, save and reopen | Saved values return; invalid email/name stays editable; PHP currency remains fixed |
+| New branch | Add a test branch, refresh, then edit its name/address | One branch is created; its ID stays the same after editing; it is available in branch selection |
+| Staff assignment | Assign a test cashier to the new branch using staff access | Cashier sees only its assigned branches and cannot open Owner settings |
+| Concurrent edits | Open the same details on two devices; save one, then save the stale form | Stale save is rejected and retains edits; cancel/refresh shows the accepted version |
+| Offline branding | Sync branch A with footer A; disconnect and sell one test item; restart the app | Receipt remains pending with the business/branch/contact/footer recorded at checkout |
+| Rename while pending | On device B, rename the business/branch and set footer B; reconnect device A and sync twice | Original receipt keeps footer A and original names; it uploads once; a subsequent sale uses refreshed footer B |
+| Tenant and account isolation | Switch businesses/accounts with settings or a receipt open | Previous account's editor closes; no other business's details appear in the selected branch or new receipt |
+| Keyboard and navigation | Use larger system text, open/edit all fields with the keyboard visible, then return to businesses | Every field can be reached; Save/Cancel stay usable; returning refreshes business and branch names |
+
+For a lost branch-creation response, refresh the branch list before starting a different request. Retrying within the same open form uses the same request identity. Do not create network failures by changing backend permissions or deleting existing data.
 
 ## Hosted isolation run
 

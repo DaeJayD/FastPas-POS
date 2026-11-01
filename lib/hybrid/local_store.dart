@@ -4,6 +4,7 @@ import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
 import '../workspaces/workspace_repository.dart';
+import '../core/receipt_details.dart';
 
 /// One file per signed-in account, business, and branch. No global active tenant.
 class LocalStore {
@@ -87,39 +88,45 @@ class LocalStore {
     List<Map<String, Object?>> products,
     String role, {
     DateTime? now,
-  }) => db.transaction((tx) async {
-    final local = await tx.query(
-      'sales',
-      where: 'status != ?',
-      whereArgs: ['synced'],
-    );
-    final deductions = <String, int>{};
-    for (final receipt in local) {
-      final payload =
-          jsonDecode(receipt['payload'] as String) as Map<String, dynamic>;
-      for (final line in payload['items'] as List) {
-        final id = line['product_id'] as String;
-        deductions[id] = (deductions[id] ?? 0) + (line['quantity'] as int);
+    ReceiptDetails? receiptDetails,
+  }) async {
+    receiptDetails?.checkScope(businessId, branchId);
+    await db.transaction((tx) async {
+      final local = await tx.query(
+        'sales',
+        where: 'status != ?',
+        whereArgs: ['synced'],
+      );
+      final deductions = <String, int>{};
+      for (final receipt in local) {
+        final payload =
+            jsonDecode(receipt['payload'] as String) as Map<String, dynamic>;
+        for (final line in payload['items'] as List) {
+          final id = line['product_id'] as String;
+          deductions[id] = (deductions[id] ?? 0) + (line['quantity'] as int);
+        }
       }
-    }
-    await tx.delete('products');
-    for (final row in products) {
-      await tx.insert('products', {
-        ...row,
-        'quantity': (row['quantity'] as int) - (deductions[row['id']] ?? 0),
-      });
-    }
-    for (final entry in {
-      'role': role,
-      'verified_at': (now ?? DateTime.now()).toUtc().toIso8601String(),
-      'revoked': 'false',
-    }.entries) {
-      await tx.insert('metadata', {
-        'key': entry.key,
-        'value': entry.value,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-  });
+      await tx.delete('products');
+      for (final row in products) {
+        await tx.insert('products', {
+          ...row,
+          'quantity': (row['quantity'] as int) - (deductions[row['id']] ?? 0),
+        });
+      }
+      for (final entry in {
+        'role': role,
+        'verified_at': (now ?? DateTime.now()).toUtc().toIso8601String(),
+        'revoked': 'false',
+        if (receiptDetails != null)
+          'receipt_details': jsonEncode(receiptDetails.toJson()),
+      }.entries) {
+        await tx.insert('metadata', {
+          'key': entry.key,
+          'value': entry.value,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
+  }
 
   Future<bool> canSell({DateTime? now}) async {
     final verified = DateTime.tryParse(await meta('verified_at') ?? '');
@@ -137,6 +144,7 @@ class LocalStore {
     Map<String, int> quantities,
     int cashCents, {
     DateTime? now,
+    ReceiptDetails? fallbackReceiptDetails,
   }) async {
     if (!await canSell(now: now)) {
       throw StateError('Connect to renew selling access.');
@@ -146,6 +154,18 @@ class LocalStore {
     }
     final device = await meta('device_id');
     return db.transaction((tx) async {
+      final branding = await tx.query(
+        'metadata',
+        where: 'key = ?',
+        whereArgs: ['receipt_details'],
+      );
+      final details = branding.isEmpty
+          ? fallbackReceiptDetails
+          : ReceiptDetails.fromJson(
+              jsonDecode(branding.single['value'] as String)
+                  as Map<String, dynamic>,
+            );
+      details?.checkScope(businessId, branchId);
       final items = <Map<String, Object?>>[];
       var total = 0;
       for (final entry in quantities.entries) {
@@ -187,6 +207,7 @@ class LocalStore {
         'occurred_at': (now ?? DateTime.now()).toUtc().toIso8601String(),
         'cash_cents': cashCents,
         'items': items,
+        if (details != null) 'receipt_details': details.toJson(),
       };
       await tx.insert('sales', {
         'id': id,

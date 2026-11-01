@@ -6,6 +6,7 @@ import 'package:http/http.dart' show ClientException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'workspace_cache.dart';
+import 'business_settings.dart';
 
 class BusinessWorkspace {
   const BusinessWorkspace({
@@ -141,6 +142,81 @@ class WorkspaceRepository {
       'branch_name': branchName.trim(),
     },
   ) as String;
+
+  Future<BusinessSettings> businessSettings(String businessId) async {
+    final data = await client
+        .rpc('pos_business_settings', params: {'business': businessId})
+        .timeout(const Duration(seconds: 12));
+    final settings = BusinessSettings.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
+    if (settings.business.id != businessId) {
+      throw StateError('Business changed');
+    }
+    return settings;
+  }
+
+  Future<void> updateBusiness(
+    BusinessDetails details, {
+    required String name,
+    required String address,
+    required String phone,
+    required String email,
+    required String footer,
+  }) async {
+    await client
+        .rpc(
+          'pos_update_business',
+          params: {
+            'business': details.id,
+            'expected_version': details.version,
+            'business_name': name,
+            'business_address': address,
+            'phone_number': phone,
+            'email_address': email,
+            'footer': footer,
+          },
+        )
+        .timeout(const Duration(seconds: 12));
+  }
+
+  Future<void> createBranch({
+    required String businessId,
+    required String requestId,
+    required String name,
+    required String address,
+  }) async {
+    await client
+        .rpc(
+          'pos_create_branch',
+          params: {
+            'business': businessId,
+            'request_id': requestId,
+            'branch_name': name,
+            'branch_address': address,
+          },
+        )
+        .timeout(const Duration(seconds: 12));
+  }
+
+  Future<void> updateBranch(
+    BranchDetails branch, {
+    required String name,
+    required String address,
+  }) async {
+    await client
+        .rpc(
+          'pos_update_branch',
+          params: {
+            'business': branch.businessId,
+            'branch': branch.id,
+            'expected_version': branch.version,
+            'branch_name': name,
+            'branch_address': address,
+          },
+        )
+        .timeout(const Duration(seconds: 12));
+  }
 
   Future<String> inviteStaff({
     required String businessId,

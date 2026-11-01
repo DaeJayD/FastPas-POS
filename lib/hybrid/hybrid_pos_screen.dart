@@ -10,6 +10,8 @@ import '../workspaces/workspace_repository.dart';
 import 'cash_rules.dart';
 import 'local_store.dart';
 import 'sync_service.dart';
+import '../core/receipt_details.dart';
+import 'receipt_presenter.dart';
 
 class HybridPosScreen extends StatefulWidget {
   const HybridPosScreen({
@@ -215,7 +217,16 @@ class _HybridPosScreenState extends State<HybridPosScreen>
         throw StateError('Account changed');
       }
       final cash = parseCents(result['Cash received']!);
-      final id = await _store!.checkout(Map.of(_cart), cash);
+      final id = await _store!.checkout(
+        Map.of(_cart),
+        cash,
+        fallbackReceiptDetails: ReceiptDetails(
+          businessId: widget.business.id,
+          branchId: widget.branch.id,
+          businessName: widget.business.name,
+          branchName: widget.branch.name,
+        ),
+      );
       final saved = await _store!.receipt(id);
       final total = saved['total_cents'] as int;
       _cart.clear();
@@ -225,8 +236,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Sale saved on this device'),
+          scrollable: true,
           content: SelectableText(
-            'Receipt $id\nTotal ${displayCents(total)}\nCash ${displayCents(cash)}\nChange ${displayCents(cash - total)}\nPending cloud synchronization',
+            '${receiptText(jsonDecode(saved['payload'] as String) as Map<String, dynamic>, total)}\n\nPending cloud synchronization',
           ),
           actions: [
             TextButton(
@@ -560,9 +572,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                         title: Text('Receipt · ${receipt['status']}'),
                         content: SingleChildScrollView(
                           child: SelectableText(
-                            '${sale['id']}\n${sale['occurred_at']}\n'
-                            '${(sale['items'] as List).map((l) => '${l['quantity']} × ${l['name']} · ${displayCents(l['unit_cents'] as int)}').join('\n')}\n'
-                            'Total ${displayCents(receipt['total_cents'] as int)}',
+                            receiptText(sale, receipt['total_cents'] as int),
                           ),
                         ),
                         actions: [

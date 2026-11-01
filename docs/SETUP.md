@@ -10,12 +10,13 @@ Create a Supabase project in your own account. Save its database password privat
 2. [Hybrid cash sales](../supabase/migrations/202610210002_hybrid_cash_sales.sql)
 3. [Staff access](../supabase/migrations/202610210003_staff_access.sql)
 4. [Staff branch assignments](../supabase/migrations/202610240001_staff_branch_access.sql)
+5. [Business and receipt settings](../supabase/migrations/202610310001_business_settings.sql)
 
 Each file has its own transaction. They create the new `pos_*` tables and functions; they are not scripts to rerun after successful installation. Record which files were applied. Do not create the old `employees`, `products`, or `sales` tables to make the legacy screens work.
 
 If the first three migrations are already installed, apply only the fourth. It adds branch reassignment and extends the Owner's staff listing; it preserves memberships and sales.
 
-The current development project already has all four migrations applied through the SQL Editor. Do not rerun them there. Manual SQL execution does not populate the CLI migration history; before switching that project to CLI deployment, compare its history and mark the verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). Repairing history records versions without re-executing the schema changes. New projects still follow the four-file sequence above.
+The current development project has all five migrations applied through the SQL Editor. The fifth was added on 31 October 2026. Do not rerun any of them there. Manual SQL execution does not populate the CLI migration history; before switching that project to CLI deployment, compare its history and mark the verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). Repairing history records versions without re-executing schema changes. New projects follow the five-file sequence above.
 
 Keep `public` exposed through the Data API. Keep `fastpas_private` out of exposed schemas. Leave row-level security and the grants installed by the migrations in place. Business ownership is created through the app, using the authenticated account.
 

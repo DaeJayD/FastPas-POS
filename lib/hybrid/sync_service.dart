@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'local_store.dart';
+import '../core/receipt_details.dart';
 
 /// Bound to one immutable user/business/branch context for its entire lifetime.
 class SyncService {
@@ -26,7 +27,7 @@ class SyncService {
     if (_running) return;
     _running = true;
     try {
-      await _verifiedRole();
+      await _verifiedAccess();
       for (final row in await store.pendingReceipts()) {
         _checkIdentity();
         final payload =
@@ -64,7 +65,9 @@ class SyncService {
     }
   }
 
-  Future<String> _verifiedRole() async {
+  Future<({String role, ReceiptDetails? details})> _verifiedAccess({
+    bool includeDetails = false,
+  }) async {
     _checkIdentity();
     final access = await Future.wait([
       client
@@ -76,22 +79,35 @@ class SyncService {
           .timeout(const Duration(seconds: 8)),
       client
           .from('pos_branches')
-          .select('id')
+          .select()
           .eq('business_id', store.businessId)
           .eq('id', store.branchId)
           .maybeSingle()
           .timeout(const Duration(seconds: 8)),
+      if (includeDetails)
+        client
+            .from('pos_businesses')
+            .select()
+            .eq('id', store.businessId)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 8)),
     ]);
     _checkIdentity();
     final membership = access[0], branch = access[1];
-    if (membership == null || branch == null) {
+    if (membership == null ||
+        branch == null ||
+        (includeDetails && access[2] == null)) {
       await store.setMeta('revoked', 'true');
       throw StateError(
         'Workspace access was removed. Pending records are retained.',
       );
     }
     _checkIdentity();
-    return membership['role'] as String;
+    final details = includeDetails
+        ? ReceiptDetails.fromRows(access[2]!, branch)
+        : null;
+    details?.checkScope(store.businessId, store.branchId);
+    return (role: membership['role'] as String, details: details);
   }
 
   Future<void> _refreshCatalog() async {
@@ -113,17 +129,21 @@ class SyncService {
       if (page.length < 500) break;
     }
     _checkIdentity();
-    final role = await _verifiedRole();
-    await store.replaceSnapshot([
-      for (final row in rows)
-        if ((row['pos_items'] as Map)['active'] == true)
-          {
-            'id': row['product_id'],
-            'name': row['pos_items']['name'],
-            'sku': row['pos_items']['sku'],
-            'price_cents': row['pos_items']['price_cents'],
-            'quantity': row['quantity'],
-          },
-    ], role);
+    final access = await _verifiedAccess(includeDetails: true);
+    await store.replaceSnapshot(
+      [
+        for (final row in rows)
+          if ((row['pos_items'] as Map)['active'] == true)
+            {
+              'id': row['product_id'],
+              'name': row['pos_items']['name'],
+              'sku': row['pos_items']['sku'],
+              'price_cents': row['pos_items']['price_cents'],
+              'quantity': row['quantity'],
+            },
+      ],
+      access.role,
+      receiptDetails: access.details,
+    );
   }
 }

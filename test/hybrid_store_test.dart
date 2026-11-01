@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:vasenizzpos/hybrid/cash_rules.dart';
 import 'package:vasenizzpos/hybrid/local_store.dart';
+import 'package:vasenizzpos/core/receipt_details.dart';
+import 'package:vasenizzpos/hybrid/receipt_presenter.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -46,6 +48,88 @@ void main() {
       expect(() => parseCents(value), throwsFormatException);
     }
   });
+  test(
+    'Offline receipt branding survives settings changes and a restart',
+    () async {
+      const original = ReceiptDetails(
+        businessId: 'b1',
+        branchId: 's1',
+        businessName: 'Original store',
+        branchName: 'Main',
+        branchAddress: 'CDO',
+        footer: 'Original footer',
+      );
+      await store.replaceSnapshot(
+        [product],
+        'cashier',
+        now: verified,
+        receiptDetails: original,
+      );
+      final id = await store.checkout({'p1': 1}, 1500, now: verified);
+      final payload = (await store.receipt(id))['payload'];
+      await store.replaceSnapshot(
+        [product],
+        'cashier',
+        now: verified,
+        receiptDetails: const ReceiptDetails(
+          businessId: 'b1',
+          branchId: 's1',
+          businessName: 'Renamed store',
+          branchName: 'Renamed branch',
+          footer: 'New footer',
+        ),
+      );
+      await store.close();
+      store = await open();
+      expect((await store.receipt(id))['payload'], payload);
+      final sale = jsonDecode(payload as String) as Map<String, dynamic>;
+      final text = receiptText(sale, 1250);
+      expect(text, contains('Original store\nMain\nCDO'));
+      expect(text, contains('Original footer'));
+      expect(text, contains('Change ₱2.50'));
+      expect(text, isNot(contains('Renamed store')));
+      expect((await store.pendingReceipts()).single['id'], id);
+    },
+  );
+  test('Receipt details cannot cross a business or branch boundary', () async {
+    const wrong = ReceiptDetails(
+      businessId: 'b2',
+      branchId: 's1',
+      businessName: 'Wrong',
+      branchName: 'Main',
+    );
+    await expectLater(
+      store.replaceSnapshot(
+        [product],
+        'cashier',
+        now: verified,
+        receiptDetails: wrong,
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      store.checkout(
+        {'p1': 1},
+        1250,
+        now: verified,
+        fallbackReceiptDetails: wrong,
+      ),
+      throwsStateError,
+    );
+    expect(await store.receipts(), isEmpty);
+    expect((await store.products()).single['quantity'], 5);
+  });
+  test(
+    'Receipts from before branding support still show exact totals and change',
+    () async {
+      final id = await store.checkout({'p1': 1}, 1500, now: verified);
+      final sale = jsonDecode(
+        (await store.receipt(id))['payload'] as String,
+      ) as Map<String, dynamic>;
+      expect(sale.containsKey('receipt_details'), isFalse);
+      expect(receiptText(sale, 1250), contains('Cash ₱15.00\nChange ₱2.50'));
+    },
+  );
   test(
     'Closing a previous branch visit does not close a reopened store',
     () async {

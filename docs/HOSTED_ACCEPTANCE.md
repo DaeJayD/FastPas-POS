@@ -6,7 +6,7 @@ The runner has been prepared locally. No hosted run has been completed for this 
 
 ## Prepare a disposable development project
 
-Follow [fresh setup](SETUP.md) first: apply the four migrations, configure email/password accounts, and keep `fastpas_private` out of exposed API schemas. Do not run this against a store's database. The runner cannot determine whether a project contains production data.
+Follow [fresh setup](SETUP.md) first: apply the five migrations, configure email/password accounts, and keep `fastpas_private` out of exposed API schemas. Do not run this against a store's database. The runner cannot determine whether a project contains production data.
 
 Use Node.js 20 or later. No additional JavaScript packages are required for this runner. From the repository root, copy the configuration:
 

@@ -102,7 +102,23 @@ void main() {
         if (route.endsWith('/pos_memberships')) {
           response = membershipRevoked ? null : {'role': 'cashier'};
         } else if (route.endsWith('/pos_branches')) {
-          response = membershipRevoked || branchRevoked ? null : {'id': branch};
+          response = membershipRevoked || branchRevoked
+              ? null
+              : {
+                  'id': branch,
+                  'business_id': business,
+                  'name': 'Main',
+                  'address': '',
+                };
+        } else if (route.endsWith('/pos_businesses')) {
+          response = {
+            'id': business,
+            'name': 'Test business',
+            'address': '',
+            'contact_phone': '',
+            'contact_email': '',
+            'receipt_footer': 'Thank you',
+          };
         } else if (route.endsWith('/pos_sync_cash_sale')) {
           final payload =
               (jsonDecode(request.body) as Map<String, dynamic>)['sale']

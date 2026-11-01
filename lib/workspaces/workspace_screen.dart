@@ -8,6 +8,7 @@ import '../hybrid/hybrid_pos_screen.dart';
 import 'workspace_repository.dart';
 import 'staff_access_screen.dart';
 import 'workspace_account.dart';
+import 'business_settings_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
   const WorkspaceScreen({super.key, required this.client, this.account});
@@ -572,6 +573,39 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       ),
                     ),
                   if (_selected != null) ...[
+                    if (_selected!.role == 'owner')
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.settings_outlined),
+                        label: const Text('Business settings'),
+                        onPressed: _busy
+                            ? null
+                            : () => _run(() async {
+                                final business = _selected!;
+                                final actor =
+                                    widget.client.auth.currentUser?.id;
+                                await Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BusinessSettingsScreen(
+                                      repository: _repository,
+                                      business: business,
+                                    ),
+                                  ),
+                                );
+                                if (!mounted ||
+                                    widget.client.auth.currentUser?.id !=
+                                        actor) {
+                                  return;
+                                }
+                                await _reload();
+                                final updated = _businesses
+                                    .where((b) => b.id == business.id)
+                                    .firstOrNull;
+                                if (updated != null && mounted) {
+                                  await _select(updated);
+                                }
+                              }),
+                      ),
                     if (_selected!.role == 'owner')
                       OutlinedButton.icon(
                         icon: const Icon(Icons.manage_accounts_outlined),

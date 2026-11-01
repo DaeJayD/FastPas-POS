@@ -18,7 +18,7 @@ The default app uses Supabase Auth email/password and lists only accessible busi
 
 ## Delivery gates
 
-1. Follow [fresh setup](SETUP.md). Validate the four migrations and allow/deny tests against a development Supabase project with real Auth and email. Embedded PostgreSQL checks already pass; hosted acceptance remains outstanding.
+1. Follow [fresh setup](SETUP.md). Validate the five migrations and allow/deny tests against a development Supabase project with real Auth and email. Embedded PostgreSQL checks already pass; hosted acceptance remains outstanding.
 2. A fresh database needs no old-record export. Only if importing legacy records later, export the actual schema, constraints, policies, views, and storage configuration. Back up and rehearse against a copy. Resolve employee identities without carrying plaintext passwords forward.
 3. Extend the business-scoped catalog and cash-sale contract to attendance, suppliers, events, files, and broader retail operations. Composite foreign keys must prohibit cross-business relationships. Enforce server permissions, including reporting views. Explicitly map ownership for any optional imported records.
 4. Connect the Graphite Volt selling and management UI to verified workspace context. Register cashier devices to one business/branch. Test two unrelated businesses and a user with different roles in each.
@@ -31,11 +31,11 @@ Business creation, invitation acceptance, and initial catalog enrollment require
 
 ## Current limits
 
-Foundation files are not proof of production tenant isolation. All four migrations are now deployed to a development Supabase project. Live schema/grant readback and anonymous API-denial checks pass, while the three-account hosted acceptance run remains pending. The default workspace app has hybrid cash selling; wider retail feature integration remains incomplete. Old-record migration is conditional on a future import.
+Foundation files are not proof of production tenant isolation. All five migrations are now deployed to a development Supabase project. Live schema/grant readback and anonymous API-denial checks pass, while the three-account hosted acceptance run remains pending. The default workspace app has hybrid cash selling; wider retail feature integration remains incomplete. Old-record migration is conditional on a future import.
 
 ## Validation
 
-The four migrations pass 95 checks in disposable embedded PostgreSQL (PGlite), with a minimal Auth identity stub. Coverage includes unrelated businesses, multiple businesses per owner, role escalation, branch restrictions, invitations, cross-business references, idempotent cash sales, rollback, stock shortages, Owner protection, staff revocation, cancelled invitations, audit privacy, branch reassignment/clearing, duplicate branch IDs, stale invitation denial, and preservation of other memberships. This does not exercise real Supabase Auth, email delivery, PostgREST, or a deployed project's grants.
+The five migrations pass 148 checks in disposable embedded PostgreSQL (PGlite), with a minimal Auth identity stub. Coverage includes unrelated businesses, multiple businesses per owner, role escalation, branch restrictions, invitations, cross-business references, idempotent cash sales, rollback, stock shortages, Owner protection, staff revocation, cancelled invitations, audit privacy, branch reassignment/clearing, duplicate branch IDs, stale invitation denial, and preservation of other memberships. This does not exercise real Supabase Auth, email delivery, PostgREST, or a deployed project's grants.
 
 To reproduce without adding JavaScript dependencies to the Flutter project, install `@electric-sql/pglite` in a temporary directory and pass its absolute `dist/index.js` path to:
 
@@ -47,7 +47,7 @@ Local Supabase integration and full hosted acceptance remain unverified. The dev
 
 The onboarding form passes phone/tablet widget checks at 360 and 1024 logical pixels with 130% text. Static analysis of the new client is clean. These checks do not validate real account registration, email verification, or a running backend.
 
-The latest full Flutter suite passes 120 tests, including staff-management layouts, cancelled removal, branch reassignment and clearing, account switching while a dialog is open, denied saves, RPC request scope, branch-only revocation with pending receipts, SDK PKCE exchanges, duplicate/invalid/expired links, recovery startup, and responsive password forms above a keyboard. Full static analysis is clean. Real Supabase acceptance remains outstanding.
+The latest full Flutter suite passes 139 tests, including staff-management layouts, cancelled removal, branch reassignment and clearing, account switching while a dialog is open, denied saves, RPC request scope, branch-only revocation with pending receipts, SDK PKCE exchanges, duplicate/invalid/expired links, recovery startup, and responsive password forms above a keyboard. Full static analysis is clean. Real Supabase acceptance remains outstanding.
 
 The default workspace Android debug APK rebuilt on 24 October with placeholder project values, including branch assignments, staff controls, and account recovery. This establishes compilation, not a working backend or device email-link acceptance. Both platform XML files parse; iOS compilation remains unverified.
 
