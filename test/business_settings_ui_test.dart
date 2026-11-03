@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -41,6 +42,8 @@ void main() {
   late SupabaseClient client;
   late Map<String, dynamic> data;
   late List<http.Request> requests;
+  Completer<void>? saveGate;
+  Object? settingsFailure;
   bool loseBranchReply = false,
       conflict = false,
       denied = false,
@@ -48,6 +51,8 @@ void main() {
   setUp(() async {
     fixture = AccountFixture();
     requests = [];
+    saveGate = null;
+    settingsFailure = null;
     loseBranchReply = false;
     conflict = false;
     denied = false;
@@ -79,6 +84,13 @@ void main() {
       authOptions: const AuthClientOptions(autoRefreshToken: false),
       httpClient: MockClient((request) async {
         requests.add(request);
+        if (request.url.path.endsWith('/pos_business_settings') &&
+            settingsFailure != null) {
+          throw settingsFailure!;
+        }
+        if (request.url.path.endsWith('/pos_update_business')) {
+          await saveGate?.future;
+        }
         final body = jsonDecode(request.body) as Map;
         Object? result;
         var status = 200;
@@ -210,6 +222,17 @@ void main() {
           -120,
           scrollable: find.byType(Scrollable).last,
         );
+        // A partially visible label can still sit under the app bar with
+        // the default test font. Center the control before simulating a tap.
+        await Scrollable.ensureVisible(
+          tester.element(find.text('Edit business details')),
+          alignment: 0.5,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Edit business details').hitTestable(),
+          findsOneWidget,
+        );
         await tester.tap(find.text('Edit business details'));
         await tester.pumpAndSettle();
         tester.view.viewInsets = const FakeViewPadding(bottom: 280);
@@ -242,7 +265,7 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('Could not complete this action'),
+      find.text('Connection unavailable. Reconnect and try again.'),
       findsOneWidget,
     );
     expect(find.widgetWithText(TextFormField, 'Downtown'), findsOneWidget);
@@ -372,6 +395,43 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+  testWidgets(
+    'A late settings save cannot pop the next route after an account round trip',
+    (tester) async {
+      await open(tester);
+      saveGate = Completer<void>();
+      addTearDown(() {
+        if (!saveGate!.isCompleted) saveGate!.complete();
+      });
+      await tester.tap(find.text('Edit business details'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Saving…'), findsOneWidget);
+      await client.auth.recoverSession(
+        jsonEncode(fixture.session('10000000-0000-4000-8000-000000000002')),
+      );
+      await tester.pump();
+      await client.auth.recoverSession(jsonEncode(fixture.session()));
+      await tester.pump();
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .push<void>(
+              MaterialPageRoute(
+                builder: (_) =>
+                    const Scaffold(body: Text('Next workspace route')),
+              ),
+            ),
+      );
+      await tester.pump();
+      saveGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Next workspace route'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
   testWidgets('Revoked Owner access clears settings on refresh', (
     tester,
   ) async {
@@ -384,4 +444,73 @@ void main() {
     expect(find.text('Edit business details'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('Settings timeout offers retry without changing the account', (
+    tester,
+  ) async {
+    settingsFailure = TimeoutException('private-timeout');
+    await open(tester);
+    expect(
+      find.text('Request timed out. Check your connection and try again.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Owner access'), findsNothing);
+    settingsFailure = null;
+    await tester.tap(find.text('Retry settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Corner shop'), findsOneWidget);
+    expect(client.auth.currentUser?.id, AccountFixture.userId);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final failure in [
+    AuthSessionMissingException('private-session'),
+    const PostgrestException(message: 'private-token', code: 'PGRST301'),
+  ]) {
+    testWidgets(
+      'Settings expired sign-in is distinct from Owner denial: ${failure.runtimeType}',
+      (tester) async {
+        settingsFailure = failure;
+        await open(tester);
+        expect(
+          find.text(
+            'Your sign-in needs refreshing. Return to Businesses and sign in again with the same account.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Owner access'), findsNothing);
+        expect(find.textContaining('private-'), findsNothing);
+        expect(find.text('Edit business details'), findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+  for (final failure in [
+    const SocketException('private-host'),
+    http.ClientException('private-request'),
+    AuthRetryableFetchException(message: 'private-refresh-error'),
+  ]) {
+    testWidgets(
+      'Settings connectivity failure can recover: ${failure.runtimeType}',
+      (tester) async {
+        settingsFailure = failure;
+        await open(tester);
+        expect(
+          find.text('Connection unavailable. Reconnect and try again.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Owner access'), findsNothing);
+        expect(find.textContaining('private-'), findsNothing);
+        settingsFailure = null;
+        await tester.tap(find.text('Retry settings'));
+        await tester.pumpAndSettle();
+        expect(find.text('Corner shop'), findsOneWidget);
+        expect(
+          requests.where((r) => r.url.path.endsWith('/pos_update_business')),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 }

@@ -13,6 +13,8 @@ Select a business, then open **Business settings**. The server verifies Owner me
 
 Settings changes require internet. A failed save keeps the form and its values open. Retrying branch creation reuses the same request UUID, so a lost reply cannot create a second branch. Reusing that ID with changed details is rejected; cancel and refresh before submitting a different request.
 
+Settings distinguish connection failures/timeouts, an expired sign-in, and an explicit Owner-access denial. Failed reads offer **Retry settings**. Reconnect before retrying a network failure; follow the sign-in guidance when the session has expired. Read retries do not resubmit settings edits or cash sales.
+
 Business and branch edits carry the version read when the form opened. A stale save is rejected rather than overwriting another device's update. Cancel and refresh to review the current version. Account changes close open settings dialogs and discard the previous account's visible settings.
 
 ## Receipts and offline operation
@@ -33,4 +35,6 @@ The client displays unavailable settings when the new RPC is absent. Existing ca
 
 All five migrations pass 148 disposable embedded PostgreSQL checks with Auth stubbed. These include Owner-only settings, anonymous and cross-business denial, read-only client table grants, optimistic version conflicts, branch creation retries, preservation of existing sales, private audits, and unchanged receipt payloads after settings edits. Hosted Auth/PostgREST and physical-device acceptance remain separate checks.
 
-All 139 Flutter tests pass and static analysis is clean. Settings, receipt previews, and the keyboard-constrained business editor also pass phone/tablet geometry checks at 130% text, with rendered previews inspected. Phase 4 acceptance still requires Owner settings edits/branch retries on the installed app and offline receipt checks. Phase 3 real-account and two-device gates remain open.
+All 146 Flutter tests pass and static analysis is clean. Settings, receipt previews, and the keyboard-constrained business editor also pass phone/tablet geometry checks at 130% text, with rendered previews inspected. The tester reported the guided Phase 4 phone checks complete on 3 November 2026; see the [device acceptance record](DEVICE_ACCEPTANCE.md). The new settings-recovery build is locally validated and still needs installation on the phone. Automated hosted acceptance and Phase 3 real-account/two-device gates remain open.
+
+The [hosted acceptance runner](HOSTED_ACCEPTANCE.md) now includes the Phase 4 RPC and receipt-branding scenarios. All 85 runner checks pass locally against the five migrations through a test-only Auth/HTTP adapter, with 16 additional report/failure assertions. A real hosted run still needs three verified test accounts and explicit fixture-write configuration.

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' show ClientException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/pos_form_dialog.dart';
@@ -75,6 +77,23 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
   }
 
   static String _message(Object error) {
+    if (error is TimeoutException) {
+      return 'Request timed out. Check your connection and try again.';
+    }
+    if (error is SocketException ||
+        error is ClientException ||
+        error is AuthRetryableFetchException) {
+      return 'Connection unavailable. Reconnect and try again.';
+    }
+    if (error is AuthSessionMissingException ||
+        (error is AuthException && error.statusCode == '401') ||
+        (error is PostgrestException &&
+            ['PGRST301', 'PGRST302', 'PGRST303'].contains(error.code))) {
+      return 'Your sign-in needs refreshing. Return to Businesses and sign in again with the same account.';
+    }
+    if (error is AuthException) {
+      return 'Could not refresh sign-in. Check your connection and try again.';
+    }
     if (error is PostgrestException) {
       if (error.code == '40001') {
         return 'Settings changed on another device. Cancel and refresh before saving again.';
@@ -89,7 +108,7 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
         return 'Check the details. If a branch request changed after a retry, cancel and refresh branches.';
       }
     }
-    return 'Could not complete this action. Check your connection and Owner access, then retry.';
+    return 'Could not complete this action. Try again. If it continues, return to Businesses and check your access.';
   }
 
   Future<void> _refresh() async {
@@ -293,11 +312,20 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
               padding: const EdgeInsets.all(20),
               children: [
                 if (_loading) const LinearProgressIndicator(),
-                if (_error != null)
+                if (_error != null) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text(_error!),
                   ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry settings'),
+                    ),
+                  ),
+                ],
                 if (settings != null) ...[
                   Card(
                     child: Padding(

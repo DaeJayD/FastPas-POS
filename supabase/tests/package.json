@@ -1,0 +1,14 @@
+{
+  "name": "fastpas-backend-tests",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test hosted_acceptance.test.mjs workspaces.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.14"
+  }
+}

@@ -46,6 +46,15 @@ flutter build apk --debug --dart-define-from-file=config/supabase.local.json --n
 flutter test integration_test/preview_smoke_test.dart -d <android-device-id>
 ```
 
+Backend tests use Node.js 20 or later and a separately locked development dependency:
+
+```powershell
+npm.cmd --prefix supabase/tests ci --ignore-scripts
+npm.cmd --prefix supabase/tests test
+```
+
+The package runs the runner safeguards and disposable embedded PostgreSQL scenarios. It does not need hosted credentials or modify Supabase. PGlite is only a test dependency; it is not packaged with the Flutter app. Real hosted acceptance is a separate opt-in command documented in [hosted acceptance](HOSTED_ACCEPTANCE.md).
+
 Use a debug APK for development. Release signing and physical-device acceptance belong to the release phase. The sample integration test exercises selling and branch navigation without calling a live store.
 
 On a memory-constrained development machine, build the sample test before starting the emulator, then run the prebuilt APK. This keeps Gradle compilation and the emulator from competing for memory:

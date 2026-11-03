@@ -1,10 +1,14 @@
-// Disposable embedded PostgreSQL tests. Pass an installed PGlite module path.
+// Disposable embedded PostgreSQL tests. A custom PGlite module path is optional.
 // Auth stubs emulate identity only; local Supabase acceptance is a separate gate.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { ApiError, runAcceptance } from './hosted_acceptance.mjs';
+import { embeddedHostedTransport } from './embedded_hosted_transport.mjs';
 
-const { PGlite } = await import(pathToFileURL(process.argv[2]).href);
+const { PGlite } = process.argv[2]
+  ? await import(pathToFileURL(process.argv[2]).href)
+  : await import('@electric-sql/pglite');
 const db = new PGlite();
 const owner = '10000000-0000-4000-8000-000000000001';
 const other = '10000000-0000-4000-8000-000000000002';
@@ -297,4 +301,64 @@ try {
   equal((await scalar('select payload from public.pos_cash_sales where id = $1', [brandedSale.id])).receipt_details.footer, 'Visit again');
   await denied(sync, [JSON.stringify({...brandedSale, receipt_details: {...brandedSale.receipt_details, footer: 'Altered'}})], '22023');
   console.log(`${checks} workspace, hybrid cash-sale, staff access, and business settings checks passed (embedded PostgreSQL; Auth stubbed).`);
+
+  // The complete hosted runner also exercises the SQL contract locally.
+  // Auth, HTTP routing, and status mapping remain stubbed in this adapter.
+  const databaseChecks = checks;
+  const transport = embeddedHostedTransport(db, [
+    { id: owner, email: 'owner@example.test' }, { id: other, email: 'other@example.test' },
+    { id: staff, email: 'staff@example.test' },
+  ]);
+  let lastReport;
+  const runnerConfig = {
+    projectUrl: 'https://embedded-test.supabase.co', expectedProjectRef: 'embedded-test',
+    publicKey: 'sb_publishable_embedded_test', allowTestWrites: true,
+    accounts: Object.fromEntries([['ownerA','owner'],['ownerB','other'],['staff','staff']].map(([label, email]) =>
+      [label, { email: `${email}@example.test`, password: 'embedded-test-only' }])),
+  };
+  const acceptance = await runAcceptance(runnerConfig, {
+    writeFixtures: true, fetchImpl: transport.fetchImpl,
+    record: async report => { lastReport = structuredClone(report); },
+  });
+  equal(acceptance.status, 'passed');
+  equal(lastReport.sessionsClosed, true);
+  equal(transport.closedSessions(), 3);
+  equal(acceptance.fixtures.businesses.length, 3);
+  equal(acceptance.fixtures.branches.length, 1);
+  equal(acceptance.fixtures.sales.length, 3);
+  equal(acceptance.checks.includes('Restored and newer receipts retain their own recorded branding on the server'), true);
+  equal(JSON.stringify(lastReport).includes('embedded-test-only'), false);
+  console.log(`${acceptance.checks.length} complete acceptance-runner checks passed locally (embedded PostgreSQL; Auth/HTTP stubbed).`);
+
+  // Lose one concurrent branch response after its ID has been journaled. The
+  // other request can still commit: failure must wait for it and retain its ID.
+  let ownerBranchRequests = 0;
+  let secondBranchSettled = false;
+  let recordedBeforeBranchRequest = false;
+  await assert.rejects(runAcceptance(runnerConfig, {
+    writeFixtures: true,
+    record: async report => { lastReport = structuredClone(report); },
+    fetchImpl: async (url, options) => {
+      if (url.pathname.endsWith('/rpc/pos_create_branch') &&
+          options.headers.Authorization === `Bearer embedded-${owner}`) {
+        ownerBranchRequests++;
+        recordedBeforeBranchRequest = lastReport.fixtures.branches.length === 1;
+        if (ownerBranchRequests === 1) return new Response(JSON.stringify({ code: 'PGRST202' }), { status: 404 });
+        const response = await transport.fetchImpl(url, options);
+        secondBranchSettled = true;
+        return response;
+      }
+      return transport.fetchImpl(url, options);
+    },
+  }), error => error instanceof ApiError && error.code === 'PGRST202');
+  equal(ownerBranchRequests, 2);
+  equal(recordedBeforeBranchRequest, true);
+  equal(secondBranchSettled, true);
+  equal(lastReport.status, 'failed');
+  equal(lastReport.fixtures.branches.length, 1);
+  equal(lastReport.sessionsClosed, true);
+  equal(transport.closedSessions(), 6);
+  await identity(owner);
+  equal(await scalar('select count(*)::int from public.pos_branches where id=$1', [lastReport.fixtures.branches[0].id]), 1);
+  console.log(`${checks - databaseChecks} acceptance-runner result assertions passed.`);
 } finally { await db.close(); }

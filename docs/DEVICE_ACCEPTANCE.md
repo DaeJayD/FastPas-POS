@@ -75,8 +75,16 @@ The Phase 4 profile APK rebuilt on 1 November 2026. Install the current `app-pro
 
 For a lost branch-creation response, refresh the branch list before starting a different request. Retrying within the same open form uses the same request identity. Do not create network failures by changing backend permissions or deleting existing data.
 
+### Guided Android checks on 3 November 2026
+
+The tester reports that the Phase 4 APK is installed and **Business settings** displays business details and branches. This confirms the initial settings screen check on the phone. Android version and installed build identity have not been independently inspected. The tester also changed the receipt footer to `FastPas test A`, saved, reopened the editor, and confirmed the value persisted. The tester created `Phase 4 check` at `Test address`, refreshed settings, and confirmed exactly one branch was listed. The tester renamed the new branch to `Phase 4 checked`, changed its address to `Updated test address`, and confirmed the receipt preview displays that name/address and `FastPas test A`. In the original stocked branch, the tester synced online, disabled Wi-Fi and mobile data, and recorded one exact-cash sale. The receipt retained `FastPas test A`, stock decreased by one, and pending receipts increased by one. After removing FastPas from Recent apps and reopening while still offline, the tester confirmed the saved receipt/footer, pending count, and single stock deduction survived. Reconnect behavior, immutable branding across settings changes, and the other checklist items remain pending until their results are recorded.
+
 ## Hosted isolation run
 
 After three distinct test accounts are verified, fill their credentials into the ignored `config/acceptance.local.json`. Keep `allowTestWrites` disabled until the project and fixtures are ready. Then follow [hosted acceptance](HOSTED_ACCEPTANCE.md). The runner retains its test businesses and writes a local report; do not substitute manual screen checks for its database assertions.
 
 Record failed steps and resolve them before marking Phase 3 complete. iOS build and callback acceptance remain pending until a macOS build and an iOS device are available.
+
+During the reconnect/settings step on 3 November 2026, a settings read initially displayed the generic connection/Owner-access message. Refreshing with internet enabled loaded the details. This records successful retry recovery; the original request failure was not independently diagnosed from the generic message. After recovery, the tester saved `FastPas test B` successfully while outside the selling branch. Original-receipt synchronization/branding and new-receipt footer checks remain pending.
+
+The tester subsequently confirmed all remaining guided Phase 4 phone tests completed on 3 November 2026. This is tester-reported acceptance of the installed Phase 4 build; no independent device trace or automated hosted report was obtained. The new settings-recovery message/Retry settings build passes 146 local Flutter tests, clean full analysis, and a fresh profile APK build; that updated build has not yet been installed on the test phone. The real three-account runner and other Phase 3 release gates remain separate.
