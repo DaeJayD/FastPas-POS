@@ -302,6 +302,9 @@ try {
   await denied(sync, [JSON.stringify({...brandedSale, receipt_details: {...brandedSale.receipt_details, footer: 'Altered'}})], '22023');
   console.log(`${checks} workspace, hybrid cash-sale, staff access, and business settings checks passed (embedded PostgreSQL; Auth stubbed).`);
 
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../migrations/202611030001_catalog_inventory.sql',import.meta.url),'utf8'));
+
   // The complete hosted runner also exercises the SQL contract locally.
   // Auth, HTTP routing, and status mapping remain stubbed in this adapter.
   const databaseChecks = checks;

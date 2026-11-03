@@ -1,5 +1,7 @@
 # FastPas POS
 
+Phase 5 catalog/inventory development is in progress. See [catalog and inventory](docs/CATALOG_INVENTORY.md) for Owner controls, stock transaction rules, and the sixth migration's deployment boundary. It has not yet been applied to the development backend.
+
 FastPas POS, formerly VaseNizz, is a Flutter-based mobile point-of-sale app evolving into a general retail system for sales, inventory, staff, multi-branch management, and reporting, with planned AI integration for sales insights and inventory assistance.
 
 The name combines **fast** and **paspas**, a Cebuano word associated with speed.

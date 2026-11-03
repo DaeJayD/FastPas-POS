@@ -7,12 +7,14 @@ class PosFormField {
     this.keyboardType,
     this.validator,
     this.maxLines = 1,
+    this.options,
   });
 
   final String label, initialValue;
   final TextInputType? keyboardType;
   final FormFieldValidator<String>? validator;
   final int maxLines;
+  final Map<String, String>? options;
 }
 
 /// The route owns the controllers until its closing animation has finished.
@@ -102,28 +104,53 @@ class _PosFormDialogState extends State<PosFormDialog> {
               ],
               for (var i = 0; i < widget.fields.length; i++) ...[
                 if (i > 0) const SizedBox(height: 18),
-                TextFormField(
-                  key: ValueKey(widget.fields[i].label),
-                  controller: _controllers[i],
-                  keyboardType: widget.fields[i].keyboardType,
-                  enabled: !_saving,
-                  maxLines: widget.fields[i].maxLines,
-                  textInputAction: widget.fields[i].maxLines > 1
-                      ? TextInputAction.newline
-                      : i == widget.fields.length - 1
-                      ? TextInputAction.done
-                      : TextInputAction.next,
-                  validator: widget.fields[i].validator,
-                  decoration: InputDecoration(
-                    labelText: widget.fields[i].label,
-                    errorMaxLines: 3,
+                if (widget.fields[i].options != null)
+                  DropdownButtonFormField<String>(
+                    key: ValueKey(widget.fields[i].label),
+                    initialValue: _controllers[i].text,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: widget.fields[i].label,
+                    ),
+                    validator: widget.fields[i].validator,
+                    items: widget.fields[i].options!.entries
+                        .map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(
+                              entry.value,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _saving
+                        ? null
+                        : (value) => _controllers[i].text = value ?? '',
+                  )
+                else
+                  TextFormField(
+                    key: ValueKey(widget.fields[i].label),
+                    controller: _controllers[i],
+                    keyboardType: widget.fields[i].keyboardType,
+                    enabled: !_saving,
+                    maxLines: widget.fields[i].maxLines,
+                    textInputAction: widget.fields[i].maxLines > 1
+                        ? TextInputAction.newline
+                        : i == widget.fields.length - 1
+                        ? TextInputAction.done
+                        : TextInputAction.next,
+                    validator: widget.fields[i].validator,
+                    decoration: InputDecoration(
+                      labelText: widget.fields[i].label,
+                      errorMaxLines: 3,
+                    ),
+                    onFieldSubmitted:
+                        i == widget.fields.length - 1 &&
+                            widget.fields[i].maxLines == 1
+                        ? (_) => _submit()
+                        : null,
                   ),
-                  onFieldSubmitted:
-                      i == widget.fields.length - 1 &&
-                          widget.fields[i].maxLines == 1
-                      ? (_) => _submit()
-                      : null,
-                ),
               ],
               if (_error != null)
                 Padding(

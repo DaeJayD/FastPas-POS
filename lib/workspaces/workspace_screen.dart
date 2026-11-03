@@ -9,6 +9,7 @@ import 'workspace_repository.dart';
 import 'staff_access_screen.dart';
 import 'workspace_account.dart';
 import 'business_settings_screen.dart';
+import '../catalog/catalog_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
   const WorkspaceScreen({super.key, required this.client, this.account});
@@ -573,6 +574,25 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       ),
                     ),
                   if (_selected != null) ...[
+                    if (_selected!.role == 'owner')
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.inventory_2_outlined),
+                        label: const Text('Catalog & inventory'),
+                        onPressed: _busy || _branches.isEmpty
+                            ? null
+                            : () => _run(() async {
+                                await Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CatalogScreen(
+                                      client: widget.client,
+                                      business: _selected!,
+                                      branch: _branches.first,
+                                    ),
+                                  ),
+                                );
+                              }),
+                      ),
                     if (_selected!.role == 'owner')
                       OutlinedButton.icon(
                         icon: const Icon(Icons.settings_outlined),

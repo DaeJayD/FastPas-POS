@@ -10,7 +10,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 2. Technical baseline and refactor | Compatible Android build tools, shared navigation and data access, duplicated branch screen consolidation, and database inventory | Complete for this refactor scope |
 | 3. Data and identity | Owner-created businesses, Supabase Auth, account recovery, memberships, invitations, tenant isolation, and branch access policies | Development schema deployed; real-account and device acceptance pending |
 | 4. Business setup | Business details, receipts, settings, and configurable branches | Implemented; phone checks reported complete; automated hosted run pending |
-| 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Planned |
+| 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Development in progress; migration local only |
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Planned |
 | 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Planned |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Planned |
