@@ -150,6 +150,12 @@ void main() {
                 'sku': 'COF',
                 'price_cents': 100,
                 'active': true,
+                if ((request.url.queryParameters['select'] ?? '').contains(
+                  'pos_categories',
+                )) ...{
+                  'category_id': 'drinks',
+                  'category': {'name': 'Drinks'},
+                },
               },
             },
           ];
@@ -171,6 +177,25 @@ void main() {
     await store.close();
     await directory.delete(recursive: true);
   });
+  test(
+    'Catalog refresh caches category labels for a later offline visit',
+    () async {
+      await SyncService(client, store).synchronize();
+      await store.close();
+      offline = true;
+      store = await LocalStore.open(
+        userId: user,
+        businessId: business,
+        branchId: branch,
+        directory: directory.path,
+        factory: databaseFactoryFfi,
+      );
+      expect((await store.products()).single['category_id'], 'drinks');
+      expect((await store.products()).single['category_name'], 'Drinks');
+      expect(await store.canSell(), isTrue);
+    },
+  );
+
   test('Lost acknowledgement retries the same business-bound sale without double local deduction', () async {
     final id = await store.checkout({'p1': 2}, 200);
     loseFirstReply = true;

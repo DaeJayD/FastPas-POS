@@ -113,7 +113,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Cash checkout · ₱12.50'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Complete sale'));
     await tester.pump(const Duration(milliseconds: 400));
     await settleDatabase();
     await tester.pump(const Duration(milliseconds: 300));

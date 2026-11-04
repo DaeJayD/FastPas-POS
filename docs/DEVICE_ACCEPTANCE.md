@@ -114,4 +114,23 @@ Measure cold startup/navigation on the physical phone in profile mode. Report de
 
 The development project now has all seven migrations installed. All fourteen deployed catalog/conflict checks pass, and the real three-account Auth/API runner passes 123 checks with admin-confirmed test identities. This does not prove email delivery or mobile callbacks. The profile APK includes the PT409 stale-edit correction; older versions can display a generic error for those new conflict responses. All 158 Flutter tests pass and analysis is clean.
 
-Current `app-profile.apk`: 98,720,450 bytes; SHA-256 `f428c23135cb1ffbc0c9fa1fc4aec461fe842fe6ed6de939d70087074f35473d`. No physical Android device was attached over ADB during this validation. The Phase 5 table remains pending until performed on the installed phone.
+Phase 5 `app-profile.apk` at that checkpoint: 98,720,450 bytes; SHA-256 `f428c23135cb1ffbc0c9fa1fc4aec461fe842fe6ed6de939d70087074f35473d`. No physical Android device was attached over ADB during this validation. The Phase 5 table remains pending until performed on the installed phone.
+
+## Phase 6 installed-device checks
+
+All checks below remain pending. Use the new Phase 6 APK as an update, preserving app data. The prior build identity above describes Phase 5. SQLite version 2 upgrades version 1 automatically; do not downgrade to an older version-1 build or clear data containing pending receipts. Keep the Phase 5 and email/native callback gates open until separately accepted.
+
+Phase 6 profile APK built on 5 November 2026: 99,064,514 bytes; SHA-256 `43eaa288d49b0aa0f93559bfd21c5bab58198465f07985dfe943b01ff0e457bd`. All 187 Flutter tests and static analysis pass. The APK's v2 signature verifies with the development Android Debug certificate; required ARM32, ARM64 and x64 app libraries are packaged. This is a local development artifact, not a store release or confirmed installation. ADB reports no attached devices.
+
+| Check | Action | Pass condition |
+|---|---|---|
+| Existing-data upgrade | Before updating, note a pending test receipt, product stock, receipt branding and saved history. Install the update and open the same branch offline | Original receipts/payloads/statuses, stock deductions and branding are still present; no extra receipt or deduction appears |
+| Product browsing | Online, sync a test business with categorized products. Search a mixed-case name and SKU, clear search, then filter a category. Repeat offline | Correct local results, explicit no-match/out-of-stock states, readable prices and unchanged cart selections |
+| Persistent cart | Select products from two categories; hide a selected product with search/filter and scroll the list | Cart count and total remain correct; Clear cart removes selections without changing stock or creating a receipt |
+| Cash review | Select two units, open Cash checkout, check names/SKUs/quantities/unit prices/total; enter insufficient and excess cash. Cancel with Android Back and reopen | Exact due/change, insufficient cash rejected, no receipt before confirmation, cart retained after cancel |
+| One confirmation | Tap checkout and confirmation rapidly using a dedicated test sale | One payment flow, one saved receipt and one stock deduction |
+| Changed quote | On another authorized device, change the product price or stock while payment is open. Allow the selling device's periodic sync to download the change, then confirm | The form requests cancelling/reviewing; typed cash remains, and no new receipt or partial stock write occurs |
+| Offline commit/restart | Disconnect Wi-Fi/data, complete one exact-cash sale, close/reopen the app, then open Saved receipts | Original pending receipt survives with original names, prices, change and branding; stock remains reduced once |
+| Receipt history/reconnect | Open each status filter, detail and older pages where available. Restore internet and tap Sync now twice | Same receipt ID becomes synced once; quantities are not deducted twice; blocked receipts keep their original payload and review reason |
+| Account switch | Switch accounts with a payment or receipt detail open and while sync is finishing | Old detail/payment closes; old cart, search and receipt rows clear; access warning remains and stale controls cannot submit |
+| Layout/performance | Test larger system text and the keyboard on phone; open Home/history, change filters and navigate Back | Controls remain reachable and responsive. Record device/build, cold-start and navigation timings; local widget results are not phone timing measurements |

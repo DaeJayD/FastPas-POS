@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart';
 import '../workspaces/workspace_repository.dart';
 import '../core/receipt_details.dart';
 import 'checkout_quote.dart';
+import 'receipt_history.dart';
 
 /// One file per signed-in account, business, and branch. No global active tenant.
 class LocalStore {
@@ -33,17 +34,29 @@ class LocalStore {
         // A previous route may finish an upload after this branch is reopened.
         // Each visit owns its connection; closing one must not close another.
         singleInstance: false,
-        version: 1,
+        version: 2,
         onCreate: (db, _) async {
           await db.execute(
             'CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
           );
           await db.execute(
-            'CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT NOT NULL, price_cents INTEGER NOT NULL, quantity INTEGER NOT NULL)',
+            "CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT NOT NULL, price_cents INTEGER NOT NULL, quantity INTEGER NOT NULL, category_id TEXT NOT NULL DEFAULT '', category_name TEXT NOT NULL DEFAULT '')",
           );
           await db.execute(
             "CREATE TABLE sales (id TEXT PRIMARY KEY, payload TEXT NOT NULL, total_cents INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', error TEXT)",
           );
+          await db.execute('CREATE INDEX sales_status ON sales(status)');
+        },
+        onUpgrade: (db, oldVersion, _) async {
+          if (oldVersion < 2) {
+            await db.execute(
+              "ALTER TABLE products ADD COLUMN category_id TEXT NOT NULL DEFAULT ''",
+            );
+            await db.execute(
+              "ALTER TABLE products ADD COLUMN category_name TEXT NOT NULL DEFAULT ''",
+            );
+            await db.execute('CREATE INDEX sales_status ON sales(status)');
+          }
         },
       ),
     );
@@ -70,6 +83,53 @@ class LocalStore {
       db.query('products', orderBy: 'name');
   Future<List<Map<String, Object?>>> receipts() =>
       db.query('sales', orderBy: 'rowid DESC');
+
+  Future<ReceiptCounts> receiptCounts() async {
+    final rows = await db.rawQuery(
+      'SELECT status, COUNT(*) AS total FROM sales GROUP BY status',
+    );
+    final counts = {
+      for (final row in rows) row['status'] as String: row['total'] as int,
+    };
+    return ReceiptCounts(
+      pending: counts['pending'] ?? 0,
+      synced: counts['synced'] ?? 0,
+      blocked: counts['blocked'] ?? 0,
+    );
+  }
+
+  /// Cursor pages exclude receipt payloads; load one payload only when opened.
+  Future<ReceiptPage> receiptPage({
+    String? status,
+    int? before,
+    int limit = 30,
+  }) async {
+    if (limit < 1 ||
+        limit > 100 ||
+        (before != null && before < 1) ||
+        (status != null &&
+            !['pending', 'synced', 'blocked'].contains(status))) {
+      throw ArgumentError('Invalid receipt page');
+    }
+    final clauses = <String>[], args = <Object?>[];
+    if (status != null) {
+      clauses.add('status = ?');
+      args.add(status);
+    }
+    if (before != null) {
+      clauses.add('rowid < ?');
+      args.add(before);
+    }
+    final rows = await db.rawQuery(
+      'SELECT rowid AS sequence, id, total_cents, status, error FROM sales ${clauses.isEmpty ? '' : 'WHERE ${clauses.join(' AND ')}'} ORDER BY rowid DESC LIMIT ?',
+      [...args, limit + 1],
+    );
+    final entries = rows.take(limit).map(SavedReceipt.new).toList();
+    return ReceiptPage(
+      entries,
+      rows.length > limit ? entries.last.sequence : null,
+    );
+  }
 
   Future<List<Map<String, Object?>>> pendingReceipts() => db.query(
     'sales',

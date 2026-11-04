@@ -118,7 +118,7 @@ class SyncService {
       final page = await client
           .from('pos_item_stock')
           .select(
-            'product_id,quantity,pos_items!inner(id,name,sku,price_cents,active)',
+            'product_id,quantity,pos_items!inner(id,name,sku,price_cents,active,category_id,category:pos_categories(name))',
           )
           .eq('business_id', store.businessId)
           .eq('branch_id', store.branchId)
@@ -140,6 +140,8 @@ class SyncService {
               'sku': row['pos_items']['sku'],
               'price_cents': row['pos_items']['price_cents'],
               'quantity': row['quantity'],
+              'category_id': row['pos_items']['category_id'] ?? '',
+              'category_name': row['pos_items']['category']?['name'] ?? '',
             },
       ],
       access.role,

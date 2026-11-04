@@ -1,6 +1,6 @@
 # Phase 6 sales plan
 
-Status: Phase 6A implemented locally following the user's continuation. Phase 5's catalog/conflict migrations are deployed and its 123 hosted Auth/API checks pass; installed-phone acceptance, email delivery and native callbacks remain pending. Local Phase 6 work does not complete those earlier gates or establish release readiness.
+Status: slices 6A–6D implemented locally following the user's continuation. See [sales behavior](SALES.md). Phase 5's catalog/conflict migrations are deployed and its 123 hosted Auth/API checks pass; installed-phone acceptance, email delivery and native callbacks remain pending. Local Phase 6 work does not complete those earlier gates or establish release readiness.
 
 ## Starting point
 
@@ -29,12 +29,12 @@ The richer product-first interface under the legacy/sample routes is not the wor
 
 The price-change and repeated-entry regressions were reproduced before correction. `CheckoutQuote` freezes displayed lines and scope before payment. SQLite checks them within the sale transaction and requests review if names, SKUs, prices or available stock changed. The open form keeps entered cash on failure. Its stable attempt ID returns the original receipt for an unchanged retry, including after reopening the database; changed cash on a committed attempt is rejected. A quote is held in memory, so a full process restart recovers committed receipts through Saved receipts rather than restoring an unfinished payment form.
 
-One active payment flow locks quantity/product changes until it closes. Clear cart removes selections without recording a sale. Account changes close payment and receipt dialogs. Receipt, stock and pending upload still commit atomically with the existing payload and version-1 schema. Tests cover concurrent confirmation, caller mutation, transaction rollback, expired access and account/business/branch boundaries. Product-first Home, the expanded review flow and separate receipt history remain subsequent slices.
+One active payment flow locks quantity/product changes until it closes. Clear cart removes selections without recording a sale. Account changes close payment and receipt dialogs. Receipt, stock and pending upload still commit atomically with the existing sale payload. Tests cover concurrent confirmation, caller mutation, transaction rollback, expired access and account/business/branch boundaries. Home now searches the local snapshot and filters cached categories without changing the cart. Cash review lists frozen lines and exact change before Complete sale. Separate receipt history provides status filters, cursor pages and a sync action; details read the original saved payload.
 
 ## Storage and interfaces
 
 - Keep `LocalStore` as the SQLite transaction boundary and `SyncService` as the upload/access boundary. Give the screen a typed sales interface instead of placing new arithmetic and persistence inside widget callbacks.
-- The local database is currently version 1. Offline category filters require cached classification metadata that the current products table does not contain. Add a versioned, additive upgrade if this metadata is included; preserve all existing products, device identity, receipt payloads, statuses and pending deductions. Test upgrading a populated version-1 file.
+- The local database is version 2. The additive upgrade adds cached category identity/name and a receipt-status index, preserving existing products, device identity, branding, receipt payloads, statuses and pending deductions. A real populated version-1 file is covered by the upgrade test. No hosted migration is needed for this change.
 - Keep sales history local to the selected account/business/branch in this phase. Downloading other devices' receipts needs a separate scoped pagination/sync contract; do not imply shared history from local results.
 - Retain existing cash-upload compatibility. Any future server change must be additive and keep old unbranded/branded receipt retries valid. Inventory history must still get one movement per accepted sale.
 - Use the shared theme and form controls. A search or category filter must not discard cart selections. Retain lazy rendering; measure cold startup and navigation on the physical phone in profile mode before claiming performance gains.

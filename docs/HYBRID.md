@@ -20,6 +20,8 @@ Sync runs on opening the branch, app resume, every 30 seconds while open, and Sy
 
 The current Saved receipts list reads the local account/branch database. It does not download receipt history from other devices. Other enrolled devices refresh catalog and stock from the server; shared receipt reporting remains planned.
 
+Phase 6 separates receipt history from Home and reads it in cursor pages of summaries; opening detail loads one original payload. Home refresh reads grouped status counts. SQLite version 2 adds cached categories and a receipt-status index without changing saved sale payloads. The populated version-1 upgrade is tested. Product search/category filters work from the cached snapshot and keep cart selections. See [workspace sales](SALES.md) for cash review, quote revalidation and local retry behavior.
+
 The server rechecks business membership, role, branch access, catalog prices, and product ownership. Network failures remain pending. Validation failures retain the receipt and display a review reason. A resolution/reversal workflow is still required before pilot use. Catalog refresh preserves pending and blocked stock deductions without deducting acknowledged sales twice. Reads paginate the catalog.
 
 Local stock checks cannot prevent two disconnected devices selling the same remaining units. The staged server accepts completed cash sales and retains negative stock for explicit shortage reconciliation. Stock allocations and configurable online-only items remain planned. Database sync never verifies a card or wallet payment.
