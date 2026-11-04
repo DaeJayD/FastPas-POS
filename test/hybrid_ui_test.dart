@@ -117,6 +117,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await settleDatabase();
     await tester.pump(const Duration(milliseconds: 300));
+    for (
+      var i = 0;
+      i < 40 && find.text('Sale saved on this device').evaluate().isEmpty;
+      i++
+    ) {
+      await settleDatabase();
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(find.text('Sale saved on this device'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Done'));

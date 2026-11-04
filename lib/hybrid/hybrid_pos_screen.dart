@@ -8,6 +8,7 @@ import '../core/pos_form_dialog.dart';
 import '../core/fastpas_theme.dart';
 import '../workspaces/workspace_repository.dart';
 import 'cash_rules.dart';
+import 'checkout_quote.dart';
 import 'local_store.dart';
 import 'sync_service.dart';
 import '../core/receipt_details.dart';
@@ -43,6 +44,8 @@ class _HybridPosScreenState extends State<HybridPosScreen>
   Map<String, int> _prices = {};
   final _cart = <String, int>{};
   bool _busy = true;
+  bool _paying = false;
+  BuildContext? _paymentDialog;
   bool _syncing = false;
   bool _allowed = false;
   String _status = 'Opening saved store…';
@@ -55,6 +58,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
     _auth = widget.client.auth.onAuthStateChange.listen(
       (event) {
         if (mounted && event.session?.user.id != _userId) {
+          final dialog = _paymentDialog;
+          _paymentDialog = null;
+          if (dialog != null && dialog.mounted) Navigator.pop(dialog);
           setState(() {
             _products = [];
             _receipts = [];
@@ -184,85 +190,127 @@ class _HybridPosScreenState extends State<HybridPosScreen>
   );
 
   Future<void> _checkout() async {
-    if (_busy || !_allowed || _cart.isEmpty) return;
-    final totalDue = _total;
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (_) => PosFormDialog(
-        title: 'Cash payment',
-        description:
-            'Total due ${displayCents(totalDue)}. Exact cash is prefilled.',
-        fields: [
-          PosFormField(
-            label: 'Cash received',
-            initialValue: (totalDue / 100).toStringAsFixed(2),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            validator: (value) {
-              try {
-                return parseCents(value ?? '') < totalDue
-                    ? 'Cash must cover the total due.'
-                    : null;
-              } on FormatException catch (error) {
-                return error.message;
-              }
-            },
-          ),
-        ],
-      ),
-    );
-    if (result == null || !mounted) return;
-    setState(() => _busy = true);
+    if (_busy || _paying || !_allowed || _cart.isEmpty) return;
+    setState(() => _paying = true);
+    String? committedId;
     try {
-      if (widget.client.auth.currentUser?.id != _store!.userId) {
-        throw StateError('Account changed');
-      }
-      final cash = parseCents(result['Cash received']!);
-      final id = await _store!.checkout(
-        Map.of(_cart),
-        cash,
-        fallbackReceiptDetails: ReceiptDetails(
-          businessId: widget.business.id,
-          branchId: widget.branch.id,
-          businessName: widget.business.name,
-          branchName: widget.branch.name,
-        ),
+      final quantities = Map<String, int>.of(_cart);
+      final quote = CheckoutQuote.capture(
+        userId: _userId!,
+        businessId: widget.business.id,
+        branchId: widget.branch.id,
+        products: _products,
+        quantities: quantities,
       );
-      final saved = await _store!.receipt(id);
+      final totalDue = quote.totalCents;
+      await showDialog<Map<String, String>>(
+        context: context,
+        builder: (dialog) {
+          _paymentDialog = dialog;
+          return PosFormDialog(
+            title: 'Cash payment',
+            description:
+                'Total due ${displayCents(totalDue)}. Exact cash is prefilled.',
+            fields: [
+              PosFormField(
+                label: 'Cash received',
+                initialValue: (totalDue / 100).toStringAsFixed(2),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  try {
+                    return parseCents(value ?? '') < totalDue
+                        ? 'Cash must cover the total due.'
+                        : null;
+                  } on FormatException catch (error) {
+                    return error.message;
+                  }
+                },
+              ),
+            ],
+            errorMessage: (error) => error is FormatException
+                ? error.message
+                : 'Sale was not saved. Check cash, stock, and selling access.',
+            onSave: (values) async {
+              if (widget.client.auth.currentUser?.id != _store!.userId) {
+                throw const FormatException(
+                  'Account changed. Return to your businesses.',
+                );
+              }
+              committedId = await _store!.checkout(
+                quantities,
+                parseCents(values['Cash received']!),
+                quote: quote,
+                isActive: () =>
+                    mounted && widget.client.auth.currentUser?.id == _userId,
+                fallbackReceiptDetails: ReceiptDetails(
+                  businessId: widget.business.id,
+                  branchId: widget.branch.id,
+                  businessName: widget.business.name,
+                  branchName: widget.branch.name,
+                ),
+              );
+              _cart.clear();
+            },
+          );
+        },
+      );
+      if (!mounted || widget.client.auth.currentUser?.id != _userId) return;
+      if (committedId == null) {
+        await _load();
+        return;
+      }
+      setState(() => _busy = true);
+      final saved = await _store!.receipt(committedId!);
       final total = saved['total_cents'] as int;
-      _cart.clear();
       await _load();
-      if (!mounted) return;
+      if (!mounted || widget.client.auth.currentUser?.id != _userId) return;
       await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Sale saved on this device'),
-          scrollable: true,
-          content: SelectableText(
-            '${receiptText(jsonDecode(saved['payload'] as String) as Map<String, dynamic>, total)}\n\nPending cloud synchronization',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
+        builder: (context) {
+          _paymentDialog = context;
+          return AlertDialog(
+            title: const Text('Sale saved on this device'),
+            scrollable: true,
+            content: SelectableText(
+              '${receiptText(jsonDecode(saved['payload'] as String) as Map<String, dynamic>, total)}\n\nPending cloud synchronization',
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
       );
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(
-          () => _status =
-              'Sale was not saved. Check cash, stock, and selling access.',
+          () => _status = committedId != null
+              ? 'Sale saved. Reopen Saved receipts to view it.'
+              : error is CheckoutChanged
+              ? error.message
+              : 'Sale was not saved. Check cash, stock, and selling access.',
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _paymentDialog = null;
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _paying = false;
+        });
+      }
     }
     _startSync();
   }
 
   Future<void> _addProduct() async {
-    if (_busy || widget.client.auth.currentUser?.id != _userId) return;
+    if (_busy || _paying || widget.client.auth.currentUser?.id != _userId) {
+      return;
+    }
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (_) => PosFormDialog(
@@ -425,11 +473,19 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                     const SizedBox(height: 12),
                     if (widget.business.role == 'owner')
                       OutlinedButton.icon(
-                        onPressed: _busy ? null : _addProduct,
+                        onPressed: _busy || _paying ? null : _addProduct,
                         icon: const Icon(Icons.add),
                         label: const Text('Add product'),
                       ),
                     const SizedBox(height: 12),
+                    if (_cart.isNotEmpty)
+                      TextButton.icon(
+                        onPressed: _busy || _paying
+                            ? null
+                            : () => setState(_cart.clear),
+                        icon: const Icon(Icons.remove_shopping_cart_outlined),
+                        label: const Text('Clear cart'),
+                      ),
                     if (_products.isEmpty)
                       const Text(
                         'Connect to download products, or add your first product.',
@@ -497,7 +553,10 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                               children: [
                                 IconButton(
                                   tooltip: 'Remove one',
-                                  onPressed: _busy || (_cart[p['id']] ?? 0) == 0
+                                  onPressed:
+                                      _busy ||
+                                          _paying ||
+                                          (_cart[p['id']] ?? 0) == 0
                                       ? null
                                       : () => setState(() {
                                           final id = p['id'] as String;
@@ -523,6 +582,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                                   tooltip: 'Add one',
                                   onPressed:
                                       _busy ||
+                                          _paying ||
                                           !_allowed ||
                                           (_cart[p['id']] ?? 0) >=
                                               (p['quantity'] as int)
@@ -562,27 +622,37 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                   subtitle: Text(
                     receipt['error'] as String? ?? receipt['id'] as String,
                   ),
-                  onTap: () {
+                  onTap: () async {
                     final sale = jsonDecode(
                       receipt['payload'] as String,
                     ) as Map<String, dynamic>;
-                    showDialog<void>(
+                    BuildContext? openedDialog;
+                    await showDialog<void>(
                       context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text('Receipt · ${receipt['status']}'),
-                        content: SingleChildScrollView(
-                          child: SelectableText(
-                            receiptText(sale, receipt['total_cents'] as int),
+                      builder: (context) {
+                        openedDialog = context;
+                        _paymentDialog = context;
+                        return AlertDialog(
+                          title: Text('Receipt · ${receipt['status']}'),
+                          content: SingleChildScrollView(
+                            child: SelectableText(
+                              receiptText(sale, receipt['total_cents'] as int),
+                            ),
                           ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        );
+                      },
                     );
+                    // Identity comparison only; the closed context is not used.
+                    // ignore: use_build_context_synchronously
+                    if (identical(_paymentDialog, openedDialog)) {
+                      _paymentDialog = null;
+                    }
                   },
                 ),
               );
@@ -593,7 +663,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: FilledButton.icon(
-              onPressed: _busy || !_allowed || _cart.isEmpty ? null : _checkout,
+              onPressed: _busy || _paying || !_allowed || _cart.isEmpty
+                  ? null
+                  : _checkout,
               icon: const Icon(Icons.shopping_bag_outlined, size: 20),
               label: Text('Cash checkout · ${displayCents(_total)}'),
             ),

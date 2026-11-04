@@ -1,6 +1,6 @@
 # Phase 6 sales plan
 
-Status: local preparation only. Phase 5's catalog/conflict migrations are deployed and its 123 hosted Auth/API checks pass; installed-phone acceptance, email delivery and native callbacks remain pending. Implementation may begin locally if the user explicitly chooses that scope; doing so does not complete those earlier gates or establish release readiness.
+Status: Phase 6A implemented locally following the user's continuation. Phase 5's catalog/conflict migrations are deployed and its 123 hosted Auth/API checks pass; installed-phone acceptance, email delivery and native callbacks remain pending. Local Phase 6 work does not complete those earlier gates or establish release readiness.
 
 ## Starting point
 
@@ -27,7 +27,9 @@ The richer product-first interface under the legacy/sample routes is not the wor
 5. Canceling an unconfirmed payment preserves the cart. A successful local commit clears that cart exactly once. Account changes close the old flow; they must not submit or display another account's records.
 6. Pending and blocked receipts retain their original payloads. Retry never edits prices, receipt branding or quantities to make an old receipt pass current validation. Resolution/reversal belongs to an explicit later workflow.
 
-The current screen captures a displayed total before opening its cash dialog, while `LocalStore.checkout` subsequently reads the stored product prices. First reproduce the price-change-during-payment case and rapid repeated payment entry in tests; use those results to drive the quote and submission changes. These are review targets, not claimed reproduced failures.
+The price-change and repeated-entry regressions were reproduced before correction. `CheckoutQuote` freezes displayed lines and scope before payment. SQLite checks them within the sale transaction and requests review if names, SKUs, prices or available stock changed. The open form keeps entered cash on failure. Its stable attempt ID returns the original receipt for an unchanged retry, including after reopening the database; changed cash on a committed attempt is rejected. A quote is held in memory, so a full process restart recovers committed receipts through Saved receipts rather than restoring an unfinished payment form.
+
+One active payment flow locks quantity/product changes until it closes. Clear cart removes selections without recording a sale. Account changes close payment and receipt dialogs. Receipt, stock and pending upload still commit atomically with the existing payload and version-1 schema. Tests cover concurrent confirmation, caller mutation, transaction rollback, expired access and account/business/branch boundaries. Product-first Home, the expanded review flow and separate receipt history remain subsequent slices.
 
 ## Storage and interfaces
 

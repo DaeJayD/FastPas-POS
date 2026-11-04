@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:vasenizzpos/hybrid/cash_rules.dart';
+import 'package:vasenizzpos/hybrid/checkout_quote.dart';
 import 'package:vasenizzpos/hybrid/local_store.dart';
 import 'package:vasenizzpos/core/receipt_details.dart';
 import 'package:vasenizzpos/hybrid/receipt_presenter.dart';
@@ -41,12 +42,189 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  Future<CheckoutQuote> review() async => CheckoutQuote.capture(
+    userId: store.userId,
+    businessId: store.businessId,
+    branchId: store.branchId,
+    products: await store.products(),
+    quantities: {'p1': 1},
+  );
+
+  test('Concurrent confirmation of one quote saves and deducts once', () async {
+    final quote = await review();
+    final ids = await Future.wait([
+      store.checkout({'p1': 1}, 1250, quote: quote, now: verified),
+      store.checkout({'p1': 1}, 1250, quote: quote, now: verified),
+    ]);
+    expect(ids, [quote.attemptId, quote.attemptId]);
+    expect((await store.receipts()).length, 1);
+    expect((await store.products()).single['quantity'], 4);
+  });
+
+  test('Changing the caller cart while confirmation runs cannot change the saved sale', () async {
+    final quote = await review();
+    final quantities = {'p1': 1};
+    final saving = store.checkout(
+      quantities,
+      1250,
+      quote: quote,
+      now: verified,
+    );
+    quantities.clear();
+    final id = await saving;
+    final payload =
+        jsonDecode((await store.receipt(id))['payload'] as String) as Map;
+    expect(payload['items'], [
+      {
+        'product_id': 'p1',
+        'name': 'Coffee',
+        'sku': 'COF',
+        'quantity': 1,
+        'unit_cents': 1250,
+      },
+    ]);
+    expect((await store.receipt(id))['total_cents'], 1250);
+    expect((await store.products()).single['quantity'], 4);
+  });
+
+  test(
+    'A changed cash retry cannot alter an already committed receipt',
+    () async {
+      final quote = await review();
+      final id = await store.checkout(
+        {'p1': 1},
+        1250,
+        quote: quote,
+        now: verified,
+      );
+      final original = (await store.receipt(id))['payload'];
+      await expectLater(
+        store.checkout({'p1': 1}, 1500, quote: quote, now: verified),
+        throwsFormatException,
+      );
+      expect((await store.receipt(id))['payload'], original);
+      expect((await store.products()).single['quantity'], 4);
+    },
+  );
+
+  for (final scope in ['account', 'business', 'branch']) {
+    test('A reviewed quote cannot cross its $scope boundary', () async {
+      final quote = await review();
+      final other = await open(
+        user: scope == 'account' ? 'u2' : 'u1',
+        business: scope == 'business' ? 'b2' : 'b1',
+        branch: scope == 'branch' ? 's2' : 's1',
+      );
+      try {
+        await other.replaceSnapshot([product], 'owner', now: verified);
+        await expectLater(
+          other.checkout({'p1': 1}, 1250, quote: quote, now: verified),
+          throwsStateError,
+        );
+        expect(await other.receipts(), isEmpty);
+        expect((await other.products()).single['quantity'], 5);
+      } finally {
+        await other.close();
+      }
+    });
+  }
+
+  test('A failed receipt insert rolls back stock and leaves the same quote retryable', () async {
+    final quote = await review();
+    await store.db.execute(
+      "CREATE TRIGGER interrupt_checkout BEFORE INSERT ON sales BEGIN SELECT RAISE(ABORT, 'Interrupted checkout'); END",
+    );
+    await expectLater(
+      store.checkout({'p1': 1}, 1250, quote: quote, now: verified),
+      throwsException,
+    );
+    expect(await store.receipts(), isEmpty);
+    expect((await store.products()).single['quantity'], 5);
+    await store.db.execute('DROP TRIGGER interrupt_checkout');
+    expect(
+      await store.checkout({'p1': 1}, 1250, quote: quote, now: verified),
+      quote.attemptId,
+    );
+    expect((await store.receipts()).length, 1);
+    expect((await store.products()).single['quantity'], 4);
+  });
+
+  test(
+    'Expired selling access permits receipt recovery but prevents a new sale',
+    () async {
+      final quote = await review();
+      final id = await store.checkout(
+        {'p1': 1},
+        1250,
+        quote: quote,
+        now: verified,
+      );
+      final expired = verified.add(const Duration(hours: 25));
+      expect(
+        await store.checkout({'p1': 1}, 1250, quote: quote, now: expired),
+        id,
+      );
+      final next = await review();
+      await expectLater(
+        store.checkout({'p1': 1}, 1250, quote: next, now: expired),
+        throwsStateError,
+      );
+      expect((await store.receipts()).length, 1);
+      expect((await store.products()).single['quantity'], 4);
+    },
+  );
+
+  test(
+    'An inactive checkout context cannot write a receipt or deduct stock',
+    () async {
+      final quote = await review();
+      await expectLater(
+        store.checkout(
+          {'p1': 1},
+          1250,
+          quote: quote,
+          now: verified,
+          isActive: () => false,
+        ),
+        throwsStateError,
+      );
+      expect(await store.receipts(), isEmpty);
+      expect((await store.products()).single['quantity'], 5);
+    },
+  );
+
   test('Exact monetary parsing rejects rounding and malformed amounts', () {
     expect(parseCents('10.01'), 1001);
     expect(parseCents('0.1'), 10);
     for (final value in ['-1', '1.001', 'NaN', '1e3', '']) {
       expect(() => parseCents(value), throwsFormatException);
     }
+  });
+  test('Retrying one reviewed checkout after restart returns its saved receipt once', () async {
+    final quote = CheckoutQuote.capture(
+      userId: store.userId,
+      businessId: store.businessId,
+      branchId: store.branchId,
+      products: await store.products(),
+      quantities: {'p1': 1},
+    );
+    final first = await store.checkout(
+      {'p1': 1},
+      1250,
+      quote: quote,
+      now: verified,
+    );
+    await store.close();
+    store = await open();
+    final retry = await store.checkout(
+      {'p1': 1},
+      1250,
+      quote: quote,
+      now: verified,
+    );
+    expect(retry, first);
+    expect((await store.receipts()).length, 1);
+    expect((await store.products()).single['quantity'], 4);
   });
   test(
     'Offline receipt branding survives settings changes and a restart',

@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../workspaces/workspace_repository.dart';
 import '../core/receipt_details.dart';
+import 'checkout_quote.dart';
 
 /// One file per signed-in account, business, and branch. No global active tenant.
 class LocalStore {
@@ -129,10 +130,22 @@ class LocalStore {
   }
 
   Future<bool> canSell({DateTime? now}) async {
-    final verified = DateTime.tryParse(await meta('verified_at') ?? '');
+    return _canSell(db, now: now);
+  }
+
+  Future<bool> _canSell(DatabaseExecutor database, {DateTime? now}) async {
+    final rows = await database.query(
+      'metadata',
+      where: 'key IN (?, ?, ?)',
+      whereArgs: ['verified_at', 'role', 'revoked'],
+    );
+    final values = {
+      for (final row in rows) row['key'] as String: row['value'] as String,
+    };
+    final verified = DateTime.tryParse(values['verified_at'] ?? '');
     final clock = (now ?? DateTime.now()).toUtc();
-    final role = await meta('role');
-    return await meta('revoked') != 'true' &&
+    final role = values['role'];
+    return values['revoked'] != 'true' &&
         ['owner', 'manager', 'cashier'].contains(role) &&
         verified != null &&
         !clock.isBefore(verified) &&
@@ -145,15 +158,53 @@ class LocalStore {
     int cashCents, {
     DateTime? now,
     ReceiptDetails? fallbackReceiptDetails,
+    CheckoutQuote? quote,
+    bool Function()? isActive,
   }) async {
-    if (!await canSell(now: now)) {
-      throw StateError('Connect to renew selling access.');
-    }
+    quantities = Map<String, int>.of(quantities);
+    quote?.checkScope(userId, businessId, branchId);
+    quote?.checkQuantities(quantities);
     if (quantities.isEmpty || quantities.length > 200) {
       throw ArgumentError('Empty or oversized cart');
     }
-    final device = await meta('device_id');
     return db.transaction((tx) async {
+      void checkActive() {
+        if (isActive?.call() == false) throw StateError('Account changed.');
+      }
+
+      checkActive();
+      if (quote != null) {
+        final saved = await tx.query(
+          'sales',
+          where: 'id = ?',
+          whereArgs: [quote.attemptId],
+          limit: 1,
+        );
+        if (saved.isNotEmpty) {
+          if (!quote.matchesSaved(
+                jsonDecode(saved.single['payload'] as String)
+                    as Map<String, dynamic>,
+                cashCents,
+              ) ||
+              saved.single['total_cents'] != quote.totalCents) {
+            throw const FormatException(
+              'This checkout was already saved with different details.',
+            );
+          }
+          checkActive();
+          return quote.attemptId;
+        }
+      }
+      if (!await _canSell(tx, now: now)) {
+        throw StateError('Connect to renew selling access.');
+      }
+      checkActive();
+      final deviceRows = await tx.query(
+        'metadata',
+        where: 'key = ?',
+        whereArgs: ['device_id'],
+      );
+      final device = deviceRows.isEmpty ? null : deviceRows.single['value'];
       final branding = await tx.query(
         'metadata',
         where: 'key = ?',
@@ -174,6 +225,16 @@ class LocalStore {
           where: 'id = ?',
           whereArgs: [entry.key],
         );
+        if (quote != null) {
+          final quoted = quote.lines.where((line) => line.id == entry.key);
+          if (rows.isEmpty ||
+              quoted.length != 1 ||
+              quoted.single.quantity != entry.value ||
+              quote.lines.length != quantities.length ||
+              !quoted.single.matches(rows.first)) {
+            throw const CheckoutChanged();
+          }
+        }
         if (rows.isEmpty ||
             entry.value < 1 ||
             entry.value > 100000 ||
@@ -190,6 +251,7 @@ class LocalStore {
           'quantity': entry.value,
           'unit_cents': price,
         });
+        checkActive();
         await tx.rawUpdate(
           'UPDATE products SET quantity = quantity - ? WHERE id = ?',
           [entry.value, entry.key],
@@ -198,7 +260,7 @@ class LocalStore {
       if (cashCents < total || total > 9000000000000) {
         throw ArgumentError('Insufficient cash');
       }
-      final id = WorkspaceRepository.newRequestId();
+      final id = quote?.attemptId ?? WorkspaceRepository.newRequestId();
       final payload = {
         'id': id,
         'business_id': businessId,
@@ -209,6 +271,7 @@ class LocalStore {
         'items': items,
         if (details != null) 'receipt_details': details.toJson(),
       };
+      checkActive();
       await tx.insert('sales', {
         'id': id,
         'payload': jsonEncode(payload),

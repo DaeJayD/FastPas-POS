@@ -236,6 +236,228 @@ void main() {
     },
   );
 
+  testWidgets(
+    'A changed price cannot silently replace the reviewed payment total',
+    (tester) async {
+      await open(tester);
+      try {
+        await tester.tap(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cash checkout · ₱25.00'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => store.replaceSnapshot([
+            {
+              'id': 'coffee',
+              'name': 'Coffee',
+              'sku': 'COFFEE',
+              'price_cents': 2000,
+              'quantity': 10,
+            },
+          ], 'owner'),
+        );
+        await tester.tap(find.text('Save'));
+        await settleStore(tester);
+        await tester.pump(const Duration(milliseconds: 350));
+        expect((await tester.runAsync(store.receipts))!, isEmpty);
+        expect(
+          find.text(
+            'Items changed. Cancel and review your cart before paying.',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<TextFormField>(find.byType(TextFormField))
+              .controller!
+              .text,
+          '25.00',
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await settleStore(tester);
+      }
+    },
+  );
+
+  testWidgets('Repeated checkout entry opens only one payment form', (
+    tester,
+  ) async {
+    await open(tester);
+    try {
+      await tester.tap(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
+      final begin = tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Cash checkout · ₱25.00'),
+          )
+          .onPressed!;
+      begin();
+      begin();
+      await tester.pumpAndSettle();
+      expect(find.text('Cash payment', skipOffstage: false), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleStore(tester);
+    }
+  });
+
+  testWidgets(
+    'An account change closes the previous payment without saving it',
+    (tester) async {
+      await open(tester);
+      try {
+        await tester.tap(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cash checkout · ₱25.00'));
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => account.client.auth.recoverSession(
+            jsonEncode(account.session('10000000-0000-4000-8000-000000000002')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect((await tester.runAsync(store.receipts))!, isEmpty);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await settleStore(tester);
+      }
+    },
+  );
+
+  testWidgets('Changed stock requests review and keeps the payment editable', (
+    tester,
+  ) async {
+    await open(tester);
+    try {
+      await tester.tap(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cash checkout · ₱25.00'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => store.replaceSnapshot([
+          {
+            'id': 'coffee',
+            'name': 'Coffee',
+            'sku': 'COFFEE',
+            'price_cents': 2500,
+            'quantity': 0,
+          },
+        ], 'owner'),
+      );
+      await tester.tap(find.text('Save'));
+      await settleStore(tester);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Items changed. Cancel and review your cart before paying.'),
+        findsOneWidget,
+      );
+      expect((await tester.runAsync(store.receipts))!, isEmpty);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleStore(tester);
+    }
+  });
+
+  testWidgets('A saved checkout receipt closes when the account changes', (
+    tester,
+  ) async {
+    await open(tester);
+    try {
+      await tester.tap(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cash checkout · ₱25.00'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await settleStore(tester);
+      await tester.pump(const Duration(milliseconds: 350));
+      for (
+        var i = 0;
+        i < 40 && find.text('Sale saved on this device').evaluate().isEmpty;
+        i++
+      ) {
+        await settleStore(tester);
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('Sale saved on this device'), findsOneWidget);
+      await tester.runAsync(
+        () => account.client.auth.recoverSession(
+          jsonEncode(account.session('10000000-0000-4000-8000-000000000002')),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await settleStore(tester);
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect((await tester.runAsync(store.receipts))!.length, 1);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleStore(tester);
+    }
+  });
+
+  testWidgets(
+    'Clear cart removes selections without recording a sale or changing stock',
+    (tester) async {
+      await open(tester);
+      try {
+        await tester.tap(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Clear cart'));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Cash checkout · ₱0.00'),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect((await tester.runAsync(store.receipts))!, isEmpty);
+        expect((await tester.runAsync(store.products))!.single['quantity'], 10);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await settleStore(tester);
+      }
+    },
+  );
+
+  testWidgets('An opened saved receipt closes when its account changes', (
+    tester,
+  ) async {
+    await tester.runAsync(() => store.checkout({'coffee': 1}, 2500));
+    await open(tester);
+    try {
+      final receipt = find.text('₱25.00 · pending');
+      await tester.scrollUntilVisible(
+        receipt,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(receipt);
+      await tester.pumpAndSettle();
+      expect(find.text('Receipt · pending'), findsOneWidget);
+      await tester.runAsync(
+        () => account.client.auth.recoverSession(
+          jsonEncode(account.session('10000000-0000-4000-8000-000000000002')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect((await tester.runAsync(store.receipts))!.length, 1);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleStore(tester);
+    }
+  });
+
   testWidgets('Cash dialog validates in place above the phone keyboard', (
     tester,
   ) async {
@@ -259,6 +481,14 @@ void main() {
       await tester.tap(find.text('Save'));
       await settleStore(tester);
       await tester.pump(const Duration(milliseconds: 350));
+      for (
+        var i = 0;
+        i < 40 && find.text('Sale saved on this device').evaluate().isEmpty;
+        i++
+      ) {
+        await settleStore(tester);
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(find.text('Sale saved on this device'), findsOneWidget);
       expect(find.textContaining('Change ₱5.00'), findsOneWidget);
       expect((await tester.runAsync(store.receipts))!.length, 1);
