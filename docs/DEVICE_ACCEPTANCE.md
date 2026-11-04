@@ -88,3 +88,30 @@ Record failed steps and resolve them before marking Phase 3 complete. iOS build 
 During the reconnect/settings step on 3 November 2026, a settings read initially displayed the generic connection/Owner-access message. Refreshing with internet enabled loaded the details. This records successful retry recovery; the original request failure was not independently diagnosed from the generic message. After recovery, the tester saved `FastPas test B` successfully while outside the selling branch. Original-receipt synchronization/branding and new-receipt footer checks remain pending.
 
 The tester subsequently confirmed all remaining guided Phase 4 phone tests completed on 3 November 2026. This is tester-reported acceptance of the installed Phase 4 build; no independent device trace or automated hosted report was obtained. The new settings-recovery message/Retry settings build passes 146 local Flutter tests, clean full analysis, and a fresh profile APK build; that updated build has not yet been installed on the test phone. The real three-account runner and other Phase 3 release gates remain separate.
+
+## Phase 5 catalog and inventory
+
+All checks below remain pending. The sixth migration is deployed and its nine schema checks passed on 4 November 2026; do not rerun it. For other projects, follow [the deployment procedure](CATALOG_INVENTORY.md#deployment-procedure). Install the new profile APK as an update without clearing app data. A locally built APK or widget screenshot does not establish a phone result.
+
+Use a dedicated test business with Main and Second branches. Keep these fixtures separate from existing receipts and the automated hosted-runner fixtures.
+
+| Check | Action | Pass condition |
+|---|---|---|
+| Product and classifications | As Owner, open Catalog & inventory. Add a brand/category/family, then a product with a family variant, a unique SKU, price PHP 19.99 and opening stock 10 in Main | Saved product name includes its variant; price, classifications and stock return after refresh/reopen; another business cannot see it |
+| Receive and count | Receive 5 units with a reason, then set a physical count of 12 | Main changes from 10 to 15 to 12; history shows opening +10, receive +5 and count -3 with the supplied reasons |
+| Transfer | Transfer exactly 3 units to Second and refresh both branches | Main has 9 and Second has 3; total remains 12; each branch has one corresponding transfer movement |
+| Threshold | Set Main's alert threshold to 10, then refresh | Main still has 9, a low-stock alert appears, and no quantity movement is invented |
+| Offline sale and restart | Open/sync Main's selling screen, disconnect, sell one unit for exact cash, fully close and reopen the app offline | One saved pending receipt survives; Main remains at 8 locally; catalog-management writes require connectivity and preserve entered values on failure |
+| Reconnect | Restore internet and sync the same branch twice, then refresh management history | Pending clears; Main is 8 and Second is 3; one sale movement is recorded, with no duplicate deduction or receipt |
+| Archive and restore | Archive the assigned brand, then edit/archive/restore the existing product; refresh | Its archived brand remains readable, a new product cannot choose that brand, stock remains unchanged, and saved receipts/history retain their recorded names |
+| Stale count on two devices | Open a count on device A; receive stock on device B; submit A's stale count | A gets a changed-record message and retains its typed count; cancel/refresh shows B's stock without overwriting it |
+| Account/role isolation | Switch accounts while a management form is open; try a cashier and an unrelated Owner | Previous form closes; Add product is disabled for the stale screen; cashier has no inventory management controls; unrelated businesses remain isolated |
+| Layout and responsiveness | Use larger system text and the keyboard in product/classification/stock forms; search, change branch, load another page, open history and go Back | Fields remain reachable, Save/Cancel work, names/prices remain readable, current search results win, and navigation preserves app data |
+
+Measure cold startup/navigation on the physical phone in profile mode. Report device model, Android version, installed build identity and observed failures separately from local test results. If an operation loses its response, retry the unchanged open form; after canceling, refresh before creating a different request. Do not change backend permissions or erase app data to simulate failures.
+
+### Current build and hosted status, 4 November 2026
+
+The development project now has all seven migrations installed. All fourteen deployed catalog/conflict checks pass, and the real three-account Auth/API runner passes 123 checks with admin-confirmed test identities. This does not prove email delivery or mobile callbacks. The profile APK includes the PT409 stale-edit correction; older versions can display a generic error for those new conflict responses. All 158 Flutter tests pass and analysis is clean.
+
+Current `app-profile.apk`: 98,720,450 bytes; SHA-256 `f428c23135cb1ffbc0c9fa1fc4aec461fe842fe6ed6de939d70087074f35473d`. No physical Android device was attached over ADB during this validation. The Phase 5 table remains pending until performed on the installed phone.

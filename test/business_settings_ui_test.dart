@@ -99,13 +99,13 @@ void main() {
               ? 403
               : missing
               ? 404
-              : 400;
+              : 409;
           result = {
             'code': denied
                 ? '42501'
                 : missing
                 ? 'PGRST202'
-                : '40001',
+                : 'PT409',
             'message': 'Unavailable',
           };
         } else if (request.url.path.endsWith('/pos_business_settings')) {

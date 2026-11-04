@@ -65,6 +65,7 @@ class _CatalogScreenState extends State<CatalogScreen>
             _movements = [];
             _branches = [];
             _busy = false;
+            _ready = false;
             _error = 'Account changed. Return to Businesses.';
           });
         }
@@ -100,7 +101,7 @@ class _CatalogScreenState extends State<CatalogScreen>
         'PGRST202' => 'Catalog and inventory are not available yet. Refresh after your workspace is updated.',
         '42501' =>
           'Owner access is required for catalog and inventory changes.',
-        '40001' =>
+        'PT409' || '40001' =>
           'This record changed. Cancel and refresh before trying again.',
         '23505' => 'That SKU, label name, or family variant already exists.',
         '22023' => 'Check the details and available stock. If a retry was changed, cancel and refresh first.',

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { checkCatalogInventory } from './catalog_acceptance.mjs';
 
 export class AcceptanceError extends Error {}
 
@@ -182,10 +183,10 @@ export async function checkBusinessSettings({
   await reject(owner, 'pos_update_business', { ...update, email_address: 'invalid' },
     'Invalid business email rejected', '22023', [400]);
   check(await owner.rpc('pos_update_business', update) === 2, 'Owner updates business settings with its version');
-  // PostgREST maps SQLSTATE class 40 to HTTP 500. Require the exact conflict
-  // code as well; unrelated server failures must never pass this check.
+  // Domain conflicts use PT409 so PostgREST does not retry them as transient
+  // serialization failures. Require both the exact code and HTTP status.
   await reject(owner, 'pos_update_business', update,
-    'Stale business edit rejected', '40001', [500]);
+    'Stale business edit rejected', 'PT409', [409]);
   await recordBranch({ id: branchRequest.request_id, businessId: business.id });
   const branchReplies = await Promise.allSettled([
     owner.rpc('pos_create_branch', branchRequest), owner.rpc('pos_create_branch', branchRequest),
@@ -199,7 +200,7 @@ export async function checkBusinessSettings({
   await reject(owner, 'pos_create_branch', { ...branchRequest, request_id: otherBusiness.branch },
     'Cross-business branch identity cannot be claimed');
   check(await owner.rpc('pos_update_branch', branchEdit) === 2, 'Owner edits branch without replacing its identity');
-  await reject(owner, 'pos_update_branch', branchEdit, 'Stale branch edit rejected', '40001', [500]);
+  await reject(owner, 'pos_update_branch', branchEdit, 'Stale branch edit rejected', 'PT409', [409]);
   await reject(owner, 'pos_update_branch', { ...branchEdit, branch: otherBusiness.branch },
     'Cross-business branch edit rejected');
   const updated = await owner.rpc('pos_business_settings', { business: business.id });
@@ -232,7 +233,7 @@ export async function runAcceptance(raw, {
   const config = validateConfig(raw, writeFixtures);
   const report = {
     runId: randomUUID(), projectUrl: config.projectUrl, startedAt: new Date().toISOString(),
-    status: 'running', checks: [], fixtures: { businesses: [], branches: [], sales: [] },
+    status: 'running', checks: [], fixtures: { businesses: [], branches: [], sales: [], inventory: [] },
   };
   const clients = Object.fromEntries(['ownerA', 'ownerB', 'staff'].map(name =>
     [name, new ProjectApi(config, fetchImpl)]));
@@ -242,11 +243,13 @@ export async function runAcceptance(raw, {
     report.checks.push(label);
     log(`PASS ${label}`);
   };
-  const denied = async (api, name, args, label, code = '42501', statuses = [401, 403]) => {
-    try { await expectRejection(() => api.rpc(name, args), code, statuses); }
+  const rejected = async (action, label, code = '42501', statuses = [401, 403]) => {
+    try { await expectRejection(action, code, statuses); }
     catch (error) { throw new AcceptanceError(`${label}: ${error.message}`); }
     check(true, label);
   };
+  const denied = (api, name, args, label, code, statuses) =>
+    rejected(() => api.rpc(name, args), label, code, statuses);
   const onlyIds = (rows, ids) => Array.isArray(rows) && rows.length === ids.length &&
     rows.every(row => ids.includes(row.id));
   const rowsFor = (api, table, business, select = 'id') =>
@@ -412,6 +415,12 @@ export async function runAcceptance(raw, {
       const branding = brandedRows.find(row => row.id === expected.id)?.payload?.receipt_details;
       return branding && Object.entries(expected.receipt_details).every(([key, value]) => branding[key] === value);
     }), 'Restored and newer receipts retain their own recorded branding on the server');
+
+    await checkCatalogInventory({
+      owner: ownerA, unrelated: ownerB, staff, anonymous, business: a, otherBusiness: b,
+      destination: settings.branches.find(branch => branch.id !== a.branch).id, check, denied, rejected,
+      recordFixture: async fixture => { report.fixtures.inventory.push(fixture); await record(report); },
+    });
 
     await ownerA.rpc('pos_change_staff_access', { business: a.id, member: users.staff.id, new_role: null });
     check(onlyIds(await rowsFor(staff, 'pos_items', a.id), []), 'Removed membership loses catalog access');

@@ -304,6 +304,7 @@ try {
 
   await db.exec('reset role');
   await db.exec(await readFile(new URL('../migrations/202611030001_catalog_inventory.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202611040001_conflict_responses.sql',import.meta.url),'utf8'));
 
   // The complete hosted runner also exercises the SQL contract locally.
   // Auth, HTTP routing, and status mapping remain stubbed in this adapter.
@@ -329,6 +330,8 @@ try {
   equal(acceptance.fixtures.businesses.length, 3);
   equal(acceptance.fixtures.branches.length, 1);
   equal(acceptance.fixtures.sales.length, 3);
+  equal(acceptance.fixtures.inventory.length, 1);
+  equal(acceptance.checks.includes('Restoring a product retains stock, threshold version and movement history'), true);
   equal(acceptance.checks.includes('Restored and newer receipts retain their own recorded branding on the server'), true);
   equal(JSON.stringify(lastReport).includes('embedded-test-only'), false);
   console.log(`${acceptance.checks.length} complete acceptance-runner checks passed locally (embedded PostgreSQL; Auth/HTTP stubbed).`);
@@ -363,5 +366,23 @@ try {
   equal(transport.closedSessions(), 6);
   await identity(owner);
   equal(await scalar('select count(*)::int from public.pos_branches where id=$1', [lastReport.fixtures.branches[0].id]), 1);
+
+  let inventoryRecordedBeforeRequest = false;
+  await assert.rejects(runAcceptance(runnerConfig, {
+    writeFixtures: true,
+    record: async report => { lastReport = structuredClone(report); },
+    fetchImpl: async (url, options) => {
+      if (url.pathname.endsWith('/rpc/pos_save_catalog_label')) {
+        inventoryRecordedBeforeRequest = lastReport.fixtures.inventory.length === 1;
+        return new Response(JSON.stringify({code:'PGRST202'}),{status:404});
+      }
+      return transport.fetchImpl(url, options);
+    },
+  }), /Anonymous cannot call pos_save_catalog_label: Expected backend denial was not confirmed/);
+  equal(inventoryRecordedBeforeRequest, true);
+  equal(lastReport.status, 'failed');
+  equal(lastReport.fixtures.inventory.length, 1);
+  equal(lastReport.sessionsClosed, true);
+  equal(transport.closedSessions(), 9);
   console.log(`${checks - databaseChecks} acceptance-runner result assertions passed.`);
 } finally { await db.close(); }

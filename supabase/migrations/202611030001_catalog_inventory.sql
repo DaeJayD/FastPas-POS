@@ -227,9 +227,10 @@ begin
   select * into existing from public.pos_items i where i.id=product and i.business_id=business for update;
   if expected>0 and not found then raise exception 'Product unavailable' using errcode='42501'; end if;
   if expected>0 and existing.version<>expected then raise exception 'Product changed; refresh' using errcode='40001'; end if;
-  if (brand is not null and not exists(select 1 from public.pos_brands b where b.id=brand and b.business_id=business and (b.active or b.id=existing.brand_id)))
-    or (category is not null and not exists(select 1 from public.pos_categories c where c.id=category and c.business_id=business and (c.active or c.id=existing.category_id)))
-    or (family is not null and not exists(select 1 from public.pos_product_families f where f.id=family and f.business_id=business and (f.active or f.id=existing.family_id))) then
+  -- Keep classification eligibility stable until the product write commits.
+  if (brand is not null and not exists(select 1 from public.pos_brands b where b.id=brand and b.business_id=business and (b.active or b.id=existing.brand_id) for share))
+    or (category is not null and not exists(select 1 from public.pos_categories c where c.id=category and c.business_id=business and (c.active or c.id=existing.category_id) for share))
+    or (family is not null and not exists(select 1 from public.pos_product_families f where f.id=family and f.business_id=business and (f.active or f.id=existing.family_id) for share)) then
     raise exception 'Classification unavailable' using errcode='42501'; end if;
   if expected=0 then
     if opening is null or opening not between 0 and 1000000000 or branch is null

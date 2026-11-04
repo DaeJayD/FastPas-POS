@@ -95,7 +95,7 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
       return 'Could not refresh sign-in. Check your connection and try again.';
     }
     if (error is PostgrestException) {
-      if (error.code == '40001') {
+      if (error.code == 'PT409' || error.code == '40001') {
         return 'Settings changed on another device. Cancel and refresh before saving again.';
       }
       if (error.code == 'PGRST202') {

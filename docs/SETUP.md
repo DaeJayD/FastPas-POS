@@ -11,12 +11,14 @@ Create a Supabase project in your own account. Save its database password privat
 3. [Staff access](../supabase/migrations/202610210003_staff_access.sql)
 4. [Staff branch assignments](../supabase/migrations/202610240001_staff_branch_access.sql)
 5. [Business and receipt settings](../supabase/migrations/202610310001_business_settings.sql)
+6. [Catalog and inventory](../supabase/migrations/202611030001_catalog_inventory.sql)
+7. [Non-retryable conflict responses](../supabase/migrations/202611040001_conflict_responses.sql)
 
 Each file has its own transaction. They create the new `pos_*` tables and functions; they are not scripts to rerun after successful installation. Record which files were applied. Do not create the old `employees`, `products`, or `sales` tables to make the legacy screens work.
 
-If the first three migrations are already installed, apply only the fourth. It adds branch reassignment and extends the Owner's staff listing; it preserves memberships and sales.
+If the first three migrations are already installed, apply the fourth, fifth, sixth, and seventh in order. The fourth adds branch reassignment and extends the Owner's staff listing; it preserves memberships and sales.
 
-The current development project has all five migrations applied through the SQL Editor. The fifth was added on 31 October 2026. Do not rerun any of them there. Manual SQL execution does not populate the CLI migration history; before switching that project to CLI deployment, compare its history and mark the verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). Repairing history records versions without re-executing schema changes. New projects follow the five-file sequence above.
+The current development project has all seven migrations applied through the SQL Editor. The fifth was added on 31 October 2026; the sixth and seventh were applied on 4 November 2026. All nine catalog deployment checks passed. The seventh replaces application-level serialization errors with HTTP conflicts; all five corrected functions were read back from the deployed database. Do not rerun any of them there. [The catalog deployment procedure](CATALOG_INVENTORY.md#deployment-procedure) is for other projects missing the catalog/conflict migrations. Manual SQL execution does not populate the CLI migration history; before switching that project to CLI deployment, compare its history and mark the verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). Repairing history records versions without re-executing schema changes. New projects follow the seven-file sequence above.
 
 Keep `public` exposed through the Data API. Keep `fastpas_private` out of exposed schemas. Leave row-level security and the grants installed by the migrations in place. Business ownership is created through the app, using the authenticated account.
 
@@ -56,7 +58,7 @@ The default `lib/main.dart` launches business workspaces and hybrid cash selling
 
 ## 4. Automated hosted acceptance
 
-After setting up the development project, follow [hosted backend acceptance](HOSTED_ACCEPTANCE.md) to check real Auth, PostgREST isolation, staff permissions, and cash-sale retries. The opt-in runner uses three verified test accounts and creates retained fixtures in a disposable project. Credentials and results stay in ignored local configuration files. This run has not yet been performed; it does not replace the device checks below.
+After setting up the development project, follow [hosted backend acceptance](HOSTED_ACCEPTANCE.md) to check real Auth, PostgREST isolation, staff permissions, and cash-sale retries. The opt-in runner uses three verified test accounts and creates retained fixtures in a disposable project. Credentials and results stay in ignored local configuration files. The 123-check run passed on 4 November 2026 using three dedicated admin-confirmed test accounts. It does not verify email delivery or replace the device checks below.
 
 ## 5. First business and acceptance checks
 
@@ -70,7 +72,7 @@ Use the [device acceptance checklist](DEVICE_ACCEPTANCE.md) for installation, re
 6. Sign out, test Forgot password, and verify the new-password form opens with the app both running and closed. Test resend, expired links, mismatched passwords, cancel, and signing in with the replacement password. Repeat on iOS when a macOS build is available.
 7. Before a real store pilot, complete a two-device outage test, blocked-sale resolution, secure device enrollment, independent backup/restore, and release signing. Offline authorization expires after 24 hours from successful verification; removal cannot reach a disconnected device immediately.
 
-These are acceptance steps to perform against the new project, not completed results. Automated tests use mocked HTTP and embedded PostgreSQL; they do not establish hosted Auth, email delivery, device callback routing, or production readiness.
+The 123-check hosted Auth/API run is complete with dedicated admin-confirmed accounts. The device steps above remain separate acceptance work. Local tests also use mocked HTTP and embedded PostgreSQL; neither those tests nor admin confirmation establish email delivery, native callbacks or production readiness.
 
 Under Manage staff access, choose Edit branch access to change an employee's assigned branches. An empty selection preserves membership but prevents opening any branch. Saving cancels that employee's unused invitations for this business. Test removal of a branch, denial on that device's next reconnect, preservation of pending receipts, and uploading those same receipts after access is explicitly restored. Owner access is not editable here. A change in one business must not affect the same employee's other memberships.
 

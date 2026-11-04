@@ -7,9 +7,11 @@ const functions = new Set([
   'pos_staff_access', 'pos_change_staff_access', 'pos_set_staff_branches',
   'pos_add_item', 'pos_sync_cash_sale', 'pos_business_settings',
   'pos_update_business', 'pos_create_branch', 'pos_update_branch',
+  'pos_catalog_labels', 'pos_save_catalog_label', 'pos_catalog_items',
+  'pos_save_catalog_item', 'pos_post_stock', 'pos_stock_history',
 ]);
 const tables = new Set(['pos_businesses', 'pos_branches', 'pos_memberships',
-  'pos_items', 'pos_item_stock', 'pos_cash_sales']);
+  'pos_items', 'pos_item_stock', 'pos_cash_sales', 'pos_brands', 'pos_stock_movements']);
 const identifier = value => {
   assert.match(value, /^[a-z_]+$/);
   return value;
@@ -96,7 +98,7 @@ export function embeddedHostedTransport(db, users) {
         return json((await db.query(`select ${columns} from public.${table}${where}`, values)).rows);
       } catch (error) {
         if (!error.code || !/^[0-9A-Z]{5}$/.test(error.code)) throw error;
-        const status = error.code === '42501' ? (actor ? 403 : 401) :
+        const status = /^PT[0-9]{3}$/.test(error.code) ? Number(error.code.slice(2)) : error.code === '42501' ? (actor ? 403 : 401) :
           ['23503', '23505'].includes(error.code) ? 409 : error.code.startsWith('40') ? 500 : 400;
         return json({ code: error.code }, status);
       }

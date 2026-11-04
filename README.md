@@ -1,6 +1,6 @@
 # FastPas POS
 
-Phase 5 catalog/inventory development is in progress. See [catalog and inventory](docs/CATALOG_INVENTORY.md) for Owner controls, stock transaction rules, and the sixth migration's deployment boundary. It has not yet been applied to the development backend.
+Phase 5 catalog and inventory are implemented, with the catalog migration and conflict-response correction deployed to the development backend. See [catalog and inventory](docs/CATALOG_INVENTORY.md) for Owner controls, stock transaction rules and remaining acceptance checks.
 
 FastPas POS, formerly VaseNizz, is a Flutter-based mobile point-of-sale app evolving into a general retail system for sales, inventory, staff, multi-branch management, and reporting, with planned AI integration for sales insights and inventory assistance.
 
@@ -8,7 +8,7 @@ The name combines **fast** and **paspas**, a Cebuano word associated with speed.
 
 ## Project status
 
-**Work in progress.** The default app now uses Supabase Auth, owner-created business workspaces, staff permissions, and hybrid cash selling. A development Supabase project is configured with all five migrations; real-account and device acceptance remain pending. The Graphite Volt redesign covers the previous selling and management screens; those remain available through a separate legacy entry point while their features move to the new business-scoped contract. AI features remain planned. The application is not ready for live store use.
+**Work in progress.** The default app now uses Supabase Auth, owner-created business workspaces, staff permissions, and hybrid cash selling. The development Supabase project has all seven migrations applied. On 4 November 2026, 123 hosted account/API acceptance checks passed using dedicated admin-confirmed test identities; email delivery, native callbacks and Phase 5 phone acceptance remain separate gates. The Graphite Volt redesign covers the previous selling and management screens; those remain available through a separate legacy entry point while their features move to the new business-scoped contract. AI features remain planned. The application is not ready for live store use.
 
 The legacy interface includes:
 
@@ -48,7 +48,7 @@ See [architecture](docs/ARCHITECTURE.md), [database contracts](docs/DATABASE.md)
 
 ## Backend setup
 
-Follow [fresh Supabase setup](docs/SETUP.md) to create a development project, apply the five migrations in order, enable email confirmation, configure `fastpas://auth-callback`, and fill the ignored `config/supabase.local.json` file. No legacy export is needed for a new database.
+Follow [fresh Supabase setup](docs/SETUP.md) to create a development project, apply the seven migrations in order, enable email confirmation, configure `fastpas://auth-callback`, and fill the ignored `config/supabase.local.json` file. Existing projects apply only missing migrations after the documented checks. No legacy export is needed for a new database.
 
 ```sh
 flutter run --dart-define-from-file=config/supabase.local.json
@@ -64,7 +64,7 @@ The explicit `lib/workspaces/main.dart` target launches the same app. `lib/legac
 
 The default workspace Android debug APK builds. The ignored local configuration now points to the development backend using its public client key. Hosted Auth settings and anonymous API-denial checks pass; real-account sign-in, email links, and multi-device acceptance remain unverified. Android callback declarations are packaged; iOS configuration is present but has not been built on macOS.
 
-The [hosted acceptance runner](docs/HOSTED_ACCEPTANCE.md) covers workspace isolation, business/branch settings, and immutable receipt branding. It is ready for use after three verified test accounts are supplied for the development project. All 85 runner checks pass locally through an embedded PostgreSQL adapter with Auth/HTTP stubbed, plus 16 runner-result assertions. Run `npm.cmd --prefix supabase/tests ci --ignore-scripts`, then `npm.cmd --prefix supabase/tests test` for the locked local suite, including the 15 guard/transport tests and 148 database checks. The three-account hosted acceptance run remains pending.
+The [hosted acceptance runner](docs/HOSTED_ACCEPTANCE.md) passed all 123 checks against the development project on 4 November 2026, covering real Auth, workspace isolation, settings, immutable receipts and inventory. Its three dedicated accounts were admin-confirmed; email delivery and native callbacks remain separate checks. The locked local suite passes 148 original database checks, 14 catalog scenarios, 23 runner-result assertions and 15 safeguard tests. Run `npm.cmd --prefix supabase/tests ci --ignore-scripts`, then `npm.cmd --prefix supabase/tests test`. All 158 Flutter tests pass, static analysis is clean and the configured profile APK builds; Phase 5 physical-phone acceptance remains pending.
 
 The Android build uses Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.21 and Java 17 bytecode. The development baseline is Flutter 3.47.4 / Dart 3.13. Release signing and physical-device validation remain planned.
 

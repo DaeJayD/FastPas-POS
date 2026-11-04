@@ -7,6 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 const db = new PGlite();
 const owner = randomUUID(), other = randomUUID(), staff = randomUUID();
 let business, otherBusiness, branch, destination, otherBranch, product;
+let upgradeFixture;
 const scalar = async (sql, args=[]) => Object.values((await db.query(sql,args)).rows[0])[0];
 const identity = async (actor=owner, role='authenticated') => {
   await db.exec('reset role');
@@ -39,10 +40,31 @@ before(async () => {
     await db.query('insert into auth.users values($1,$2,now())',[id,`${email}@example.test`]);
   }
   for(const file of ['202610210001_business_workspaces.sql','202610210002_hybrid_cash_sales.sql',
-    '202610210003_staff_access.sql','202610240001_staff_branch_access.sql','202610310001_business_settings.sql',
-    '202611030001_catalog_inventory.sql']) {
+    '202610210003_staff_access.sql','202610240001_staff_branch_access.sql','202610310001_business_settings.sql']) {
     await db.exec(await readFile(new URL(`../migrations/${file}`,import.meta.url),'utf8'));
   }
+  await identity();
+  const priorBusiness = randomUUID();
+  await rpc('pos_create_business',{request_id:priorBusiness,business_name:'Before upgrade',branch_name:'Original'});
+  const priorBranch = await scalar('select id from public.pos_branches where business_id=$1',[priorBusiness]);
+  const priorProduct = await rpc('pos_add_item',{business:priorBusiness,branch:priorBranch,product_name:'Original item',product_sku:'ORIGINAL',unit_cents:1999,opening_quantity:10});
+  const sale = {id:randomUUID(),business_id:priorBusiness,branch_id:priorBranch,device_id:randomUUID(),occurred_at:new Date().toISOString(),cash_cents:3998,
+    items:[{product_id:priorProduct,name:'Original item',sku:'ORIGINAL',quantity:2,unit_cents:1999}]};
+  await rpc('pos_sync_cash_sale',{sale});
+  upgradeFixture={business:priorBusiness,branch:priorBranch,product:priorProduct,sale,
+    receipt:(await db.query('select * from public.pos_cash_sales where id=$1',[sale.id])).rows[0]};
+  await db.exec('reset role');
+  const preflight=await db.query(await readFile(new URL('../catalog_inventory_preflight.sql',import.meta.url),'utf8'));
+  assert.equal(preflight.rows[0].phase_4_installed,true);
+  assert.equal(preflight.rows[0].phase_5_installed,false);
+  await db.exec(await readFile(new URL('../migrations/202611030001_catalog_inventory.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202611040001_conflict_responses.sql',import.meta.url),'utf8'));
+  const verification=await db.query(await readFile(new URL('../verify_catalog_inventory.sql',import.meta.url),'utf8'));
+  assert.equal(verification.rows.length,9);
+  for(const check of verification.rows) assert.equal(check.passed,true,check.check_name);
+  const conflicts=await db.query(await readFile(new URL('../verify_conflict_responses.sql',import.meta.url),'utf8'));
+  assert.equal(conflicts.rows.length,5);
+  for(const check of conflicts.rows) assert.equal(check.passed,true,check.function_name);
 });
 after(()=>db.close());
 beforeEach(async () => {
@@ -60,6 +82,31 @@ beforeEach(async () => {
   await identity(staff);await rpc('pos_accept_invitation',{invite_code:code});await identity();
 });
 
+test('upgrading preserves existing stock and receipts and records only a migration snapshot',async()=>{
+  const prior=upgradeFixture;
+  const receipt=(await db.query('select * from public.pos_cash_sales where id=$1',[prior.sale.id])).rows[0];
+  assert.deepEqual(receipt,prior.receipt);
+  const rows=await rpc('pos_catalog_items',{business:prior.business,branch:prior.branch});
+  assert.equal(rows[0].quantity,8);assert.equal(rows[0].base_name,'Original item');assert.equal(rows[0].stock_version,1);
+  const movements=await rpc('pos_stock_history',{business:prior.business,branch:prior.branch,product:prior.product});
+  assert.equal(movements.length,1);assert.equal(movements[0].kind,'snapshot');assert.equal(movements[0].after_quantity,8);
+  await rpc('pos_sync_cash_sale',{sale:prior.sale});
+  const afterRetry=await rpc('pos_catalog_items',{business:prior.business,branch:prior.branch});
+  assert.equal(afterRetry[0].quantity,8);
+  assert.equal((await rpc('pos_stock_history',{business:prior.business,branch:prior.branch,product:prior.product})).length,1);
+});
+
+test('revision conflicts use a non-retryable HTTP conflict without modifying records',async()=>{
+  await reject(()=>rpc('pos_update_business',{business,expected_version:0,business_name:'Lost edit',business_address:'',phone_number:'',email_address:'',footer:''}),'PT409');
+  await reject(()=>rpc('pos_update_branch',{business,branch,expected_version:0,branch_name:'Lost edit',branch_address:''}),'PT409');
+  const brand=await label('brand','Protected brand');
+  await reject(()=>label('brand','Lost edit',{label_id:brand.id,expected_version:9}),'PT409');
+  await reject(()=>rpc('pos_save_catalog_item',{business,request_id:randomUUID(),item:{id:product,version:9,name:'Lost edit',sku:'WATER',price_cents:2500,active:true}}),'PT409');
+  await reject(()=>stock('count',1,{stock_version:9}),'PT409');
+  assert.equal((await page())[0].quantity,10);
+  assert.equal((await rpc('pos_business_settings',{business})).business.settings_version,1);
+});
+
 test('opening stock has an immutable ledger and version; SKU pages preserve existing products',async()=>{
   const items=await page();assert.equal(items.length,1);assert.equal(items[0].quantity,10);assert.equal(items[0].stock_version,1);
   const movements=await history();assert.equal(movements.length,1);assert.equal(movements[0].kind,'opening');
@@ -74,7 +121,7 @@ test('catalog labels are scoped, versioned, archived without deleting references
   await reject(()=>rpc('pos_save_catalog_label',{...args,label_name:'Other'}),'22023');
   await label('brand','acme').then(()=>assert.fail('duplicate accepted'),error=>assert.equal(error.code,'23505'));
   assert.equal((await label('brand','Acme',{label_id:id,expected_version:1,enabled:false})).version,2);
-  await reject(()=>label('brand','Lost edit',{label_id:id,expected_version:1}),'40001');
+  await reject(()=>label('brand','Lost edit',{label_id:id,expected_version:1}),'PT409');
   assert.equal((await rpc('pos_catalog_labels',{business})).brands[0].active,false);
 });
 test('anonymous, cashier and unrelated owners cannot manage another business inventory',async()=>{
@@ -100,7 +147,7 @@ test('stale stock counts fail without overwriting a sale; failed cash sales roll
   const sale={id:randomUUID(),business_id:business,branch_id:branch,device_id:randomUUID(),occurred_at:new Date().toISOString(),cash_cents:2500,
     items:[{product_id:product,name:'Water',sku:'WATER',quantity:1,unit_cents:2500}]};
   await rpc('pos_sync_cash_sale',{sale});await rpc('pos_sync_cash_sale',{sale});
-  await reject(()=>stock('count',20),'40001');assert.equal((await page())[0].quantity,9);
+  await reject(()=>stock('count',20),'PT409');assert.equal((await page())[0].quantity,9);
   const rows=await history();assert.equal(rows.length,2);assert.equal(rows.find(row=>row.kind==='sale').sale_id,sale.id);
   await reject(()=>rpc('pos_sync_cash_sale',{sale:{...sale,id:randomUUID(),cash_cents:0}}),'22023');
   assert.equal((await history()).length,2);assert.equal((await page())[0].stock_version,2);
@@ -123,7 +170,7 @@ test('failed transfers and invalid counts retain both branch stocks and ledger',
 test('low-stock thresholds version correctly without inventing a quantity movement',async()=>{
   const result=await stock('threshold',4);assert.equal(result.quantity,10);assert.equal(result.stock_version,2);
   assert.equal((await page())[0].low_stock_threshold,4);assert.equal((await history()).length,1);
-  await reject(()=>stock('receive',1),'40001');
+  await reject(()=>stock('receive',1),'PT409');
 });
 test('SKU variants carry full sale names and cannot reference another business classification',async()=>{
   const family=await label('family','T-shirts'),category=await label('category','Clothing');
@@ -142,7 +189,31 @@ test('catalog edits reject stale versions, archive safely, and retain recorded r
     brand_id:null,category_id:null,family_id:null,variant_label:''}};
   assert.equal((await rpc('pos_save_catalog_item',args)).version,2);
   assert.deepEqual(await page(),[]);assert.equal((await page(branch,{include_archived:true}))[0].name,'Renamed water');
-  await reject(()=>rpc('pos_save_catalog_item',{...args,request_id:randomUUID()}),'40001');
+  await reject(()=>rpc('pos_save_catalog_item',{...args,request_id:randomUUID()}),'PT409');
   assert.equal((await history())[0].product_name,'Water');
   await reject(()=>page(branch,{page_size:101}),'22023');await reject(()=>page(otherBranch),'42501');
+});
+
+test('archived classifications can stay on existing products but cannot be newly assigned',async()=>{
+  const brand=await label('brand','Original brand');
+  const item={id:product,version:1,name:'Water',sku:'WATER',price_cents:2500,active:true,
+    brand_id:brand.id,category_id:null,family_id:null,variant_label:''};
+  await rpc('pos_save_catalog_item',{business,request_id:randomUUID(),item});
+  await label('brand','Original brand',{label_id:brand.id,expected_version:1,enabled:false});
+  await rpc('pos_save_catalog_item',{business,request_id:randomUUID(),item:{...item,version:2,price_cents:2600}});
+  assert.equal((await page())[0].brand_id,brand.id);
+  await reject(()=>rpc('pos_save_catalog_item',{business,request_id:randomUUID(),item:{...item,id:randomUUID(),version:0,sku:'NEW',branch_id:branch,opening_quantity:0}}),'42501');
+  assert.equal((await page())[0].price_cents,2600);
+});
+
+test('negative stock remains explicit until counted and source shortages cannot be transferred',async()=>{
+  const sale={id:randomUUID(),business_id:business,branch_id:branch,device_id:randomUUID(),occurred_at:new Date().toISOString(),cash_cents:30000,
+    items:[{product_id:product,name:'Water',sku:'WATER',quantity:12,unit_cents:2500}]};
+  await rpc('pos_sync_cash_sale',{sale});
+  assert.equal((await page())[0].quantity,-2);
+  await reject(()=>stock('transfer',1,{stock_version:2,destination_id:destination,destination_version:0}),'22023');
+  assert.equal((await stock('receive',1,{stock_version:2})).quantity,-1);
+  assert.equal((await stock('count',4,{stock_version:3,reason:'Physical count after shortage review'})).quantity,4);
+  const rows=await history();assert.equal(rows.length,4);
+  assert.equal(rows.find(row=>row.kind==='count').before_quantity,-1);
 });
