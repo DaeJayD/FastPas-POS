@@ -414,6 +414,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
           client: widget.client,
           store: _store!,
           branchName: widget.branch.name,
+          canRecordReturns:
+              widget.business.role == 'owner' ||
+              widget.business.role == 'manager',
           onSync: () async {
             _startSync();
             await _operation;

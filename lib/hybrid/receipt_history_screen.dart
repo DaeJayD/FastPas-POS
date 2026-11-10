@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/fastpas_theme.dart';
+import 'cash_return_dialog.dart';
+import 'cash_return_repository.dart';
 import 'cash_rules.dart';
 import 'local_store.dart';
 import 'receipt_history.dart';
@@ -18,11 +20,13 @@ class ReceiptHistoryScreen extends StatefulWidget {
     required this.store,
     required this.branchName,
     required this.onSync,
+    this.canRecordReturns = false,
   });
   final SupabaseClient client;
   final LocalStore store;
   final String branchName;
   final Future<void> Function() onSync;
+  final bool canRecordReturns;
 
   @override
   State<ReceiptHistoryScreen> createState() => _ReceiptHistoryScreenState();
@@ -117,7 +121,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
     try {
       final row = await widget.store.receipt(summary.id);
       if (!mounted || !_sameAccount) return;
-      await showDialog<void>(
+      final openReturn = await showDialog<bool>(
         context: context,
         builder: (context) {
           _dialog = context;
@@ -150,6 +154,11 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
               ],
             ),
             actions: [
+              if (widget.canRecordReturns && row['status'] == 'synced')
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Cash return'),
+                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Close'),
@@ -158,6 +167,24 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
           );
         },
       );
+      if (openReturn != true || !mounted || !_sameAccount) return;
+      _dialog = null;
+      final recorded = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          _dialog = context;
+          return CashReturnDialog(
+            repository: CashReturnRepository(
+              widget.client,
+              widget.store,
+              summary.id,
+            ),
+          );
+        },
+      );
+      _dialog = null;
+      if (recorded == true && mounted && _sameAccount) await _sync();
     } catch (_) {
       if (mounted && _sameAccount) {
         setState(

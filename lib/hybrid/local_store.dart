@@ -79,6 +79,39 @@ class LocalStore {
       }, conflictAlgorithm: ConflictAlgorithm.replace)
       .then((_) {});
 
+  String _cashReturnKey(String saleId) => 'cash_return:$saleId';
+
+  Future<String?> pendingCashReturn(String saleId) =>
+      meta(_cashReturnKey(saleId));
+
+  Future<void> rememberCashReturn(String saleId, String request) async {
+    final key = _cashReturnKey(saleId);
+    await db.transaction((tx) async {
+      await tx.insert('metadata', {
+        'key': key,
+        'value': request,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      final saved = await tx.query(
+        'metadata',
+        where: 'key = ?',
+        whereArgs: [key],
+      );
+      if (saved.single['value'] != request) {
+        throw const FormatException(
+          'Check the saved return request before starting another.',
+        );
+      }
+    });
+  }
+
+  Future<void> clearCashReturn(String saleId, String request) async {
+    await db.delete(
+      'metadata',
+      where: 'key = ? AND value = ?',
+      whereArgs: [_cashReturnKey(saleId), request],
+    );
+  }
+
   Future<List<Map<String, Object?>>> products() =>
       db.query('products', orderBy: 'name');
   Future<List<Map<String, Object?>>> receipts() =>

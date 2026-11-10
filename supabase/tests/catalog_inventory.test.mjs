@@ -65,6 +65,7 @@ before(async () => {
   const conflicts=await db.query(await readFile(new URL('../verify_conflict_responses.sql',import.meta.url),'utf8'));
   assert.equal(conflicts.rows.length,5);
   for(const check of conflicts.rows) assert.equal(check.passed,true,check.function_name);
+  await db.exec(await readFile(new URL('../migrations/202611100001_cash_returns.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 beforeEach(async () => {
@@ -216,4 +217,96 @@ test('negative stock remains explicit until counted and source shortages cannot 
   assert.equal((await stock('count',4,{stock_version:3,reason:'Physical count after shortage review'})).quantity,4);
   const rows=await history();assert.equal(rows.length,4);
   assert.equal(rows.find(row=>row.kind==='count').before_quantity,-1);
+});
+
+const waterLine = () => ({product_id:product,name:'Water',sku:'WATER',quantity:3,unit_cents:2500});
+async function syncedSale(items=[waterLine()]) {
+  const sale={id:randomUUID(),business_id:business,branch_id:branch,device_id:randomUUID(),
+    occurred_at:new Date().toISOString(),cash_cents:items.reduce((sum,item)=>sum+item.quantity*item.unit_cents,0)+10000,items};
+  await rpc('pos_sync_cash_sale',{sale});
+  return sale.id;
+}
+const returnScope = sale => ({p_business:business,p_branch:branch,p_sale:sale});
+const returnLine = (quantity,restock=true,id=product) => ({product_id:id,quantity,restock});
+const returnRequest = (sale,items) => ({...returnScope(sale),p_request:randomUUID(),p_reason:'Customer return',p_items:items});
+
+test('partial returns use the original receipt price and stock only increases for restocked units',async()=>{
+  const sale=await syncedSale();
+  const original=(await db.query('select * from public.pos_cash_sales where id=$1',[sale])).rows[0];
+  await rpc('pos_save_catalog_item',{business,request_id:randomUUID(),
+    item:{id:product,version:1,name:'Renamed water',sku:'WATER',price_cents:3000,active:false,
+      brand_id:null,category_id:null,family_id:null,variant_label:''}});
+
+  const first=returnRequest(sale,[returnLine(1)]);
+  const result=await rpc('pos_record_cash_return',first);
+  assert.equal(result.id,first.p_request);
+  assert.equal(result.total_cents,2500);
+  assert.deepEqual(await rpc('pos_record_cash_return',first),result);
+  await reject(()=>rpc('pos_record_cash_return',{...first,p_items:[returnLine(2)]}),'PT409');
+
+  const second=await rpc('pos_record_cash_return',returnRequest(sale,[returnLine(2,false)]));
+  assert.equal(second.total_cents,5000);
+  assert.deepEqual(await rpc('pos_cash_return_options',returnScope(sale)),[
+    {...waterLine(),remaining_quantity:0},
+  ]);
+  assert.equal((await page(branch,{include_archived:true}))[0].quantity,8);
+  const movements=(await history()).filter(row=>row.kind==='return');
+  assert.equal(movements.length,1);
+  assert.equal(movements[0].quantity_delta,1);
+  assert.equal(movements[0].sale_id,sale);
+  assert.equal(movements[0].request_id,first.p_request);
+  assert.deepEqual((await db.query('select * from public.pos_cash_sales where id=$1',[sale])).rows[0],original);
+  await reject(()=>rpc('pos_record_cash_return',returnRequest(sale,[returnLine(1,false)])),'PT409');
+});
+
+test('an invalid later return line rolls back the earlier stock movement and leaves the request reusable',async()=>{
+  const second=await rpc('pos_add_item',{business,branch,product_name:'Cup',product_sku:'CUP',unit_cents:100,opening_quantity:10});
+  const sale=await syncedSale([waterLine(),{product_id:second,name:'Cup',sku:'CUP',quantity:3,unit_cents:100}]);
+  const sorted=[product,second].sort();
+  const request=returnRequest(sale,[returnLine(1,true,sorted[0]),returnLine(4,true,sorted[1])]);
+  await reject(()=>rpc('pos_record_cash_return',request),'PT409');
+  assert.deepEqual((await page()).map(row=>row.quantity),[7,7]);
+  assert.equal((await history()).filter(row=>row.kind==='return').length,0);
+  assert.deepEqual((await rpc('pos_cash_return_options',returnScope(sale))).map(row=>row.remaining_quantity),[3,3]);
+  const corrected={...request,p_items:sorted.map(id=>returnLine(1,true,id))};
+  const result=await rpc('pos_record_cash_return',corrected);
+  assert.equal(result.total_cents,2600);
+  assert.deepEqual(await rpc('pos_record_cash_return',{...corrected,p_items:[...corrected.p_items].reverse()}),result);
+  assert.deepEqual((await page()).map(row=>row.quantity),[8,8]);
+});
+
+test('only owners and managers assigned to the receipt branch can read or record returns',async()=>{
+  const sale=await syncedSale();
+  const request=returnRequest(sale,[returnLine(1)]);
+  for(const [actor,role] of [['','anon'],[staff,'authenticated'],[other,'authenticated']]) {
+    await identity(actor,role);
+    await reject(()=>rpc('pos_cash_return_options',returnScope(sale)),'42501');
+    await reject(()=>rpc('pos_record_cash_return',request),'42501');
+  }
+  await identity();
+  await reject(()=>rpc('pos_record_cash_return',{...request,p_branch:destination}),'22023');
+  await reject(()=>rpc('pos_record_cash_return',{...request,p_sale:randomUUID()}),'22023');
+  await rpc('pos_change_staff_access',{business,member:staff,new_role:'manager'});
+  await identity(staff);
+  assert.equal((await rpc('pos_cash_return_options',returnScope(sale)))[0].remaining_quantity,3);
+  assert.equal((await rpc('pos_record_cash_return',request)).total_cents,2500);
+  await reject(()=>db.query('select * from fastpas_private.cash_returns'),'42501');
+  await reject(()=>db.query('delete from fastpas_private.cash_return_lines'),'42501');
+  await identity();
+  await reject(()=>rpc('pos_record_cash_return',request),'PT409');
+  await rpc('pos_set_staff_branches',{business,member:staff,branches:`{${destination}}`});
+  await identity(staff);
+  await reject(()=>rpc('pos_record_cash_return',request),'42501');
+});
+
+test('returns reject invalid quantities, duplicate products, missing disposition and off-receipt products',async()=>{
+  const sale=await syncedSale();
+  const request=returnRequest(sale,[returnLine(1)]);
+  for(const items of [[],[returnLine(1),returnLine(1)],[returnLine(0)],[returnLine(1.5)],[returnLine('1')],
+    [{product_id:product,quantity:1}],[returnLine(1,false,randomUUID())]]) {
+    await reject(()=>rpc('pos_record_cash_return',{...request,p_items:items}),'22023');
+  }
+  await reject(()=>rpc('pos_record_cash_return',{...request,p_reason:'\t\n'}),'22023');
+  assert.equal((await page())[0].quantity,7);
+  assert.equal((await rpc('pos_cash_return_options',returnScope(sale)))[0].remaining_quantity,3);
 });

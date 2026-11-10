@@ -12,7 +12,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 4. Business setup | Business details, receipts, settings, and configurable branches | Implemented; earlier phone checks reported complete; hosted account/API checks passed |
 | 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Development schema deployed; hosted account/API checks passed; Phase 5 phone acceptance pending |
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Slices 6A–6D implemented locally; final acceptance and earlier phone/email/callback gates remain |
-| 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Planned |
+| 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | 7A cash returns in local development. Hosted and device acceptance, cash movements, and shifts remain open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Planned |
 | 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale development slice implemented; wider sync and device acceptance planned |
 | 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
@@ -131,3 +131,11 @@ Phase 6A was published with frozen checkout quotes, stable local attempt IDs, at
 On 5 November 2026, slices 6B–6D add the [workspace product Home, cash review and receipt history](SALES.md). Name/SKU search and cached category filters preserve the cart. Phone lists and wider grids build products lazily; the cart stays visible. Cash review displays the frozen lines and exact change before Complete sale. History uses cursor pages and status filters, reads a payload only for detail, and offers sync of the existing pending queue. Home refresh reads counts instead of loading all receipt JSON. A late sync can no longer replace an account-change warning.
 
 The additive SQLite version-2 upgrade preserves a populated version-1 file, including pending receipts, stock deductions, device identity, access and branding. It adds cached category fields and a receipt-status index; no new Supabase migration is required. A read-only authenticated Owner category-query check succeeded against the existing development schema. The staff fixture had no categorized stock to verify that populated read. No business data or server permissions were changed. All 187 Flutter tests pass, static analysis is clean and the configured profile APK builds and verifies. No physical Android device was attached. Installed-phone acceptance and the earlier release gates remain open.
+
+## Phase 7A cash returns
+
+Owners and assigned managers can open **Cash return** from a synced receipt on their device. The dialog shows the remaining units, the original unit prices and the refund total. Staff choose which units to put back in stock and enter a reason. The cashier handles the cash handoff.
+
+The eighth migration records each return separately from the original sale. Refund amounts use recorded sale prices. The database caps cumulative quantities per receipt line and commits the return, its lines and any stock movements together. The app saves the request on the device before sending it, so a lost reply can be retried after reopening the app with the same account and receipt.
+
+Local validation passed 189 Flutter tests and 34 backend test groups. The new tests cover returns at the original price, optional restocking, branch permissions, rollback, and recovery after reopening SQLite. Development deployment, concurrent hosted acceptance and installed-device checks are pending. Cash movements, cashier shifts and shift reconciliation are the next Phase 7 slice.
