@@ -1,6 +1,8 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:http/http.dart' show ClientException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'local_store.dart';
@@ -110,7 +112,10 @@ class SyncService {
       // The server may have committed a still-pending receipt. Keep its local
       // stock deduction against the previous snapshot until we have its reply.
       if (await store.hasPendingReceipts()) return SyncOutcome.queued;
-      await _refreshCatalog();
+      final role = await _refreshCatalog();
+      if (['owner', 'manager', 'cashier'].contains(role)) {
+        await _registerDevice(force: force);
+      }
       return await store.hasPendingReceipts()
           ? SyncOutcome.queued
           : SyncOutcome.synchronized;
@@ -128,6 +133,52 @@ class SyncService {
       attempts,
       _clock().add(Duration(seconds: _retrySeconds[index])),
     );
+  }
+
+  Future<void> _registerDevice({required bool force}) async {
+    final lastCheck = int.tryParse(
+      await store.meta('device_registration_checked_ms') ?? '',
+    );
+    final now = _clock().millisecondsSinceEpoch;
+    if (!force &&
+        lastCheck != null &&
+        now >= lastCheck &&
+        now - lastCheck < const Duration(minutes: 5).inMilliseconds) {
+      return;
+    }
+    final device = await store.deviceId;
+    if (isActive?.call() == false) return;
+    final session = client.auth.currentSession;
+    if (session == null || session.user.id != store.userId) return;
+    try {
+      final acknowledgment = await client
+          .rpc(
+            'pos_register_selling_device',
+            params: {
+              'p_business': store.businessId,
+              'p_branch': store.branchId,
+              'p_device': device,
+            },
+          )
+          .setHeader('Authorization', 'Bearer ${session.accessToken}')
+          .timeout(const Duration(seconds: 3));
+      if (acknowledgment != device) return;
+    } on PostgrestException catch (error) {
+      // Development projects can still be on the previous schema.
+      if (error.code != 'PGRST202') return;
+    } on TimeoutException {
+      return;
+    } on ClientException {
+      return;
+    } on SocketException {
+      return;
+    }
+    if (client.auth.currentUser?.id == store.userId) {
+      await store.setMeta(
+        'device_registration_checked_ms',
+        '${_clock().millisecondsSinceEpoch}',
+      );
+    }
   }
 
   Future<({String role, ReceiptDetails? details})> _verifiedAccess({
@@ -186,7 +237,7 @@ class SyncService {
     return (role: membership['role'] as String, details: details);
   }
 
-  Future<void> _refreshCatalog() async {
+  Future<String> _refreshCatalog() async {
     _checkIdentity();
     // Page large catalogs explicitly; the server's default row cap is not a catalog limit.
     final rows = <Map<String, dynamic>>[];
@@ -229,5 +280,6 @@ class SyncService {
       access.role,
       receiptDetails: access.details,
     );
+    return access.role;
   }
 }

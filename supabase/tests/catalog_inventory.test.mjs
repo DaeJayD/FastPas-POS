@@ -68,6 +68,7 @@ before(async () => {
   await db.exec(await readFile(new URL('../migrations/202611100001_cash_returns.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../migrations/202611100002_cash_shifts.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../migrations/202611100003_branch_cash_report.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202611110001_selling_devices.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 beforeEach(async () => {
@@ -97,6 +98,68 @@ test('upgrading preserves existing stock and receipts and records only a migrati
   const afterRetry=await rpc('pos_catalog_items',{business:prior.business,branch:prior.branch});
   assert.equal(afterRetry[0].quantity,8);
   assert.equal((await rpc('pos_stock_history',{business:prior.business,branch:prior.branch,product:prior.product})).length,1);
+});
+
+test('selling devices register once and keep first-seen time when they check in again', async () => {
+  const device = randomUUID();
+  const params = {p_business:business,p_branch:branch,p_device:device};
+  const list = () => rpc('pos_branch_selling_devices',{p_business:business,p_branch:branch});
+  await identity(staff);
+  assert.equal(await rpc('pos_register_selling_device',params),device);
+  assert.equal(await rpc('pos_register_selling_device',params),device);
+  await identity();
+  const [first] = await list();
+  assert.equal((await list()).length,1);
+  assert.equal(first.device_id,device);
+  assert.equal(first.registered_at,first.last_seen_at);
+  await db.exec('reset role');
+  await db.query("update fastpas_private.selling_devices set last_seen_at = now() - interval '6 minutes' where id = $1",[first.id]);
+  await identity(staff);
+  assert.equal(await rpc('pos_register_selling_device',params),device);
+  await identity();
+  const [seenAgain] = await list();
+  assert.equal(seenAgain.id,first.id);
+  assert.equal(seenAgain.registered_at,first.registered_at);
+  assert.ok(Date.parse(seenAgain.last_seen_at)>Date.parse(first.last_seen_at));
+});
+
+test('registration enforces branch access and only the owner can page that branch devices', async () => {
+  const device = randomUUID();
+  const params = {p_business:business,p_branch:branch,p_device:device};
+  const list = {p_business:business,p_branch:branch};
+  await identity(staff);
+  await reject(rpc('pos_register_selling_device',{...params,p_branch:destination}),'42501');
+  assert.equal(await rpc('pos_register_selling_device',params),device);
+  await reject(rpc('pos_branch_selling_devices',list),'42501');
+  await reject(scalar('select count(*) from fastpas_private.selling_devices'),'42501');
+  await identity(other);
+  await reject(rpc('pos_register_selling_device',params),'42501');
+  await reject(rpc('pos_branch_selling_devices',list),'42501');
+  await rpc('pos_register_selling_device',{p_business:otherBusiness,p_branch:otherBranch,p_device:device});
+  await identity();
+  await reject(rpc('pos_register_selling_device',{...params,p_branch:otherBranch}),'42501');
+  await reject(rpc('pos_branch_selling_devices',{...list,p_branch:otherBranch}),'42501');
+  await reject(rpc('pos_register_selling_device',{...params,p_device:null}),'22023');
+  await rpc('pos_set_staff_branches',{business,member:staff,branches:`{${destination}}`});
+  await identity(staff);
+  await reject(rpc('pos_register_selling_device',params),'42501');
+  await identity(null,'anon');
+  await reject(rpc('pos_register_selling_device',params),'42501');
+  await reject(rpc('pos_branch_selling_devices',list),'42501');
+
+  await db.exec('reset role');
+  await db.query(`insert into fastpas_private.selling_devices
+    (business_id,branch_id,user_id,device_id,registered_at,last_seen_at)
+    select $1,$2,$3,gen_random_uuid(),now(),now() from generate_series(1,51)`,[business,branch,owner]);
+  await identity();
+  const first = await rpc('pos_branch_selling_devices',list);
+  const next = await rpc('pos_branch_selling_devices',{...list,p_after:first[49].id});
+  assert.equal(first.length,51);
+  assert.equal(next.length,2);
+  assert.equal(first[50].id,next[0].id);
+  assert.equal(new Set([...first.slice(0,50),...next].map(row=>row.id)).size,52);
+  assert.equal([...first.slice(0,50),...next].filter(row=>row.device_id===device).length,1);
+  assert.deepEqual(await rpc('pos_branch_selling_devices',{...list,p_branch:destination}),[]);
 });
 
 test('revision conflicts use a non-retryable HTTP conflict without modifying records',async()=>{

@@ -79,6 +79,7 @@ class LocalStore {
   }
 
   Future<String?> meta(String key) => _meta(db, key);
+  Future<String> get deviceId async => (await meta('device_id'))!;
 
   Future<String?> _meta(DatabaseExecutor database, String key) async {
     final rows = await database.query(

@@ -37,6 +37,8 @@ void main() {
   Completer<void>? uploadRequested, releaseUpload;
   String? uploadAuthorization;
   var revokeDuringCatalog = false;
+  var registrationRequests = <Map<String, dynamic>>[];
+  var registrationUnavailable = false;
   Future<void> restoreIdentity(String id) async {
     String encode(Object data) =>
         base64Url.encode(utf8.encode(jsonEncode(data))).replaceAll('=', '');
@@ -81,6 +83,8 @@ void main() {
     releaseUpload = null;
     uploadAuthorization = null;
     revokeDuringCatalog = false;
+    registrationRequests = [];
+    registrationUnavailable = false;
     directory = await Directory.systemTemp.createTemp('fastpas-sync-');
     store = await LocalStore.open(
       userId: user,
@@ -169,6 +173,18 @@ void main() {
           uploadRequested?.complete();
           if (releaseUpload != null) await releaseUpload!.future;
           response = wrongAcknowledgment ? 'different-receipt' : payload['id'];
+        } else if (route.endsWith('/pos_register_selling_device')) {
+          final params = jsonDecode(request.body) as Map<String, dynamic>;
+          registrationRequests.add(params);
+          if (registrationUnavailable) {
+            return http.Response(
+              jsonEncode({'code': 'PGRST202', 'message': 'Function missing'}),
+              404,
+              request: request,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          response = params['p_device'];
         } else if (route.endsWith('/pos_item_stock')) {
           stockReads++;
           if (stockRequested case final signal? when !signal.isCompleted) {
@@ -245,6 +261,55 @@ void main() {
     await store.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'Registers the receipt device and keeps its check interval after reopening',
+    () async {
+      final device = await store.deviceId;
+      final id = await store.checkout({'p1': 1}, 100);
+      var now = DateTime.utc(2026, 11, 11);
+      await SyncService(client, store, clock: () => now).synchronize();
+      expect(registrationRequests.single, {
+        'p_business': business,
+        'p_branch': branch,
+        'p_device': device,
+      });
+      expect(received.single['device_id'], device);
+      expect((await store.receipts()).single['id'], id);
+      expect((await store.receipts()).single['status'], 'synced');
+
+      await store.close();
+      store = await LocalStore.open(
+        userId: user,
+        businessId: business,
+        branchId: branch,
+        directory: directory.path,
+        factory: databaseFactoryFfi,
+      );
+      now = now.add(const Duration(minutes: 4));
+      final reopened = SyncService(client, store, clock: () => now);
+      await reopened.synchronize();
+      expect(await store.deviceId, device);
+      expect(registrationRequests, hasLength(1));
+      now = now.add(const Duration(minutes: 1));
+      await reopened.synchronize();
+      expect(registrationRequests, hasLength(2));
+      expect(registrationRequests.last['p_device'], device);
+    },
+  );
+
+  test(
+    'An older backend still synchronizes receipts without registration',
+    () async {
+      registrationUnavailable = true;
+      await store.checkout({'p1': 1}, 100);
+      final sync = SyncService(client, store);
+      expect(await sync.synchronize(), SyncOutcome.synchronized);
+      expect((await store.receipts()).single['status'], 'synced');
+      await sync.synchronize();
+      expect(registrationRequests, hasLength(1));
+    },
+  );
   test(
     'Catalog refresh caches category labels for a later offline visit',
     () async {
@@ -538,6 +603,7 @@ void main() {
         throwsStateError,
       );
       expect(await store.canSell(), isFalse);
+      expect(registrationRequests, isEmpty);
     },
   );
   test('Catalog cursor avoids duplicate rows when stock is inserted before the next page', () async {

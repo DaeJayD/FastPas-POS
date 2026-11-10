@@ -23,6 +23,7 @@ class SellingHome extends StatelessWidget {
     required this.syncing,
     required this.locked,
     required this.allowed,
+    this.deviceId,
     this.onAddProduct,
     this.onRetry,
   });
@@ -37,6 +38,7 @@ class SellingHome extends StatelessWidget {
   final ValueChanged<String?> onCategory;
   final void Function(String id, int delta) onQuantity;
   final String status;
+  final String? deviceId;
   final int pending, blocked;
   final VoidCallback? onAddProduct, onRetry;
 
@@ -122,6 +124,14 @@ class SellingHome extends StatelessWidget {
                                 color: Volt.muted,
                               ),
                             ),
+                            if (deviceId case final id?)
+                              Text(
+                                'Device ${id.split('-').first.toUpperCase()}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Volt.muted,
+                                ),
+                              ),
                           ],
                         ),
                       ),

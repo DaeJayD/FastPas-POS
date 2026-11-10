@@ -1,5 +1,7 @@
 import '../core/receipt_details.dart';
 
+typedef SellingDevice = ({String id, String deviceId, DateTime lastSeen});
+
 class BusinessDetails {
   const BusinessDetails({
     required this.id,

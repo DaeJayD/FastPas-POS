@@ -43,6 +43,7 @@ void main() {
   late Map<String, dynamic> data;
   late List<http.Request> requests;
   Completer<void>? saveGate;
+  Completer<void>? devicesGate;
   Object? settingsFailure;
   bool loseBranchReply = false,
       conflict = false,
@@ -52,6 +53,7 @@ void main() {
     fixture = AccountFixture();
     requests = [];
     saveGate = null;
+    devicesGate = null;
     settingsFailure = null;
     loseBranchReply = false;
     conflict = false;
@@ -91,6 +93,9 @@ void main() {
         if (request.url.path.endsWith('/pos_update_business')) {
           await saveGate?.future;
         }
+        if (request.url.path.endsWith('/pos_branch_selling_devices')) {
+          await devicesGate?.future;
+        }
         final body = jsonDecode(request.body) as Map;
         Object? result;
         var status = 200;
@@ -110,6 +115,14 @@ void main() {
           };
         } else if (request.url.path.endsWith('/pos_business_settings')) {
           result = data;
+        } else if (request.url.path.endsWith('/pos_branch_selling_devices')) {
+          result = [
+            {
+              'id': 'registration',
+              'device_id': '01abcdef-0000-4000-8000-000000000001',
+              'last_seen_at': '2026-11-11T00:00:00Z',
+            },
+          ];
         } else if (request.url.path.endsWith('/pos_create_branch')) {
           final branches = data['branches'] as List;
           if (!branches.any((b) => b['id'] == body['request_id'])) {
@@ -201,6 +214,45 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Owner can view the selected branch selling devices', (
+    tester,
+  ) async {
+    await open(tester);
+    await reveal(tester, find.text('Selling devices'));
+    await tester.tap(find.text('Selling devices'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selling devices · Main'), findsOneWidget);
+    expect(find.text('Device 01ABCDEF'), findsOneWidget);
+    expect(find.textContaining('Last seen'), findsOneWidget);
+    final request = requests.singleWhere(
+      (r) => r.url.path.endsWith('/pos_branch_selling_devices'),
+    );
+    expect(jsonDecode(request.body), {
+      'p_business': 'business',
+      'p_branch': 'branch',
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Account change closes the device list before a late reply', (
+    tester,
+  ) async {
+    await open(tester);
+    devicesGate = Completer<void>();
+    await reveal(tester, find.text('Selling devices'));
+    await tester.tap(find.text('Selling devices'));
+    await tester.pump();
+    await client.auth.recoverSession(
+      jsonEncode(fixture.session('10000000-0000-4000-8000-000000000002')),
+    );
+    await tester.pumpAndSettle();
+    devicesGate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Device 01ABCDEF'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.textContaining('Account changed'), findsOneWidget);
+  });
+
   for (final width in [360.0, 1024.0]) {
     testWidgets(
       'Settings and receipt preview fit width $width with larger text',
@@ -280,6 +332,7 @@ void main() {
       (jsonDecode(writes[1].body) as Map)['request_id'],
     );
     expect((data['branches'] as List).length, 2);
+    await reveal(tester, find.text('Downtown'));
     expect(find.text('Downtown'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());

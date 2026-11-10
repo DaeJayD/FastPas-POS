@@ -6,6 +6,7 @@ import 'package:http/http.dart' show ClientException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/pos_form_dialog.dart';
+import 'branch_devices_dialog.dart';
 import 'business_settings.dart';
 import 'workspace_repository.dart';
 
@@ -290,6 +291,25 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
     _dialog = null;
   }
 
+  Future<void> _devices(BranchDetails branch) async {
+    if (_actor == null ||
+        widget.repository.client.auth.currentUser?.id != _actor) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        _dialog = context;
+        return BranchDevicesDialog(
+          repository: widget.repository,
+          branch: branch,
+          ownerId: _actor,
+        );
+      },
+    );
+    _dialog = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
@@ -411,6 +431,12 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
                                         ? null
                                         : () => _preview(branch),
                                     child: const Text('Receipt preview'),
+                                  ),
+                                  TextButton(
+                                    onPressed: _loading
+                                        ? null
+                                        : () => _devices(branch),
+                                    child: const Text('Selling devices'),
                                   ),
                                 ],
                               ),

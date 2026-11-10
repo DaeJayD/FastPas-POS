@@ -156,6 +156,39 @@ class WorkspaceRepository {
     return settings;
   }
 
+  Future<List<SellingDevice>> branchSellingDevices(
+    BranchDetails branch, {
+    required String ownerId,
+    String? after,
+  }) async {
+    final session = client.auth.currentSession;
+    if (session == null || session.user.id != ownerId) {
+      throw StateError('Owner account changed');
+    }
+    final rows = await client
+        .rpc(
+          'pos_branch_selling_devices',
+          params: {
+            'p_business': branch.businessId,
+            'p_branch': branch.id,
+            if (after != null) 'p_after': after,
+          },
+        )
+        .setHeader('Authorization', 'Bearer ${session.accessToken}')
+        .timeout(const Duration(seconds: 8));
+    if (client.auth.currentUser?.id != ownerId) {
+      throw StateError('Owner account changed');
+    }
+    return [
+      for (final row in rows as List)
+        (
+          id: row['id'] as String,
+          deviceId: row['device_id'] as String,
+          lastSeen: DateTime.parse(row['last_seen_at'] as String),
+        ),
+    ];
+  }
+
   Future<void> updateBusiness(
     BusinessDetails details, {
     required String name,

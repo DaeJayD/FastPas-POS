@@ -10,6 +10,8 @@ Owners add products, exact prices in centavos, and opening stock while online. P
 
 Each account/business/branch gets a separate SQLite file. Immutable upload payloads retain their original business, branch, and device-context UUID. Signing out preserves pending records; another account cannot discover or upload them through this flow. Business and branch discovery labels are cached per account, with a 24-hour expiry. Permission failures invalidate discovery instead of falling back to stale labels.
 
+After a successful online catalog refresh, the selling screen checks in with the server using the saved device UUID. The owner can match the code shown on the selling screen with **Business settings → Selling devices** for that branch. Automatic check-ins run at most once every five minutes after a successful registration. **Sync now** can retry early. The list records the last successful check-in, and staff assignments control who can sell. Existing receipts and their device IDs carry forward through the update.
+
 First sign-in, business creation, invitations, and catalog enrollment require internet. Existing signed-in accounts can sell for up to 24 hours after successful membership, branch, and catalog verification. Known revocation disables local selling. Revocation cannot be detected while disconnected. Device clock and sandbox protection are not tamper-proof. PIN staff switching and secure device enrollment remain planned.
 
 ## Sync and conflicts

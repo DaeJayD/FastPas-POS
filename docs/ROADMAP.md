@@ -14,7 +14,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Slices 6A–6D implemented locally; final acceptance and earlier phone/email/callback gates remain |
 | 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Returns and shift workflows implemented. Hosted and device acceptance remain open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Branch cash reports and CSV implemented. Hosted and device acceptance remain open. |
-| 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale retry and stock refresh hardened. Device registration and multi-device acceptance remain open. |
+| 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale recovery and selling device registration implemented. Hosted and multi-device acceptance remain open. |
 | 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
 
 ## Current interface
@@ -160,4 +160,10 @@ Local validation passed 193 Flutter tests, 39 backend test groups and static ana
 
 The cash-sale queue uploads in bounded batches and persists retry timing in SQLite version 3. Lost or mismatched acknowledgments retain the original payload and device ID. Sync now can retry early. One sync operation per local store keeps a second branch visit from uploading into an older visit's stock refresh. Catalog paging follows product IDs, and the previous snapshot stays in place while an upload remains unconfirmed. Local upgrades from versions 1 and 2 preserve pending receipts and stock deductions.
 
-Device registration, broader offline operations and independent two-device acceptance remain open. Follow the [Phase 9 device checks](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) for the cash-sale queue.
+Broader offline operations and independent two-device acceptance remain open. Follow the [Phase 9 device checks](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) for the cash-sale queue.
+
+## Phase 9B selling device registration
+
+After an online branch sync refreshes the catalog, FastPas checks in using the same device ID stored on local cash receipts. Owners can open **Business settings**, choose **Selling devices** on a branch and match its device codes to the selling screens. Each registration belongs to the signed-in account and branch, with a server-recorded last-seen time. Registering again preserves the original registration and pending receipts.
+
+Migration eleven adds the registry. It needs development deployment and the [two-device checks](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks). Branch access remains managed through staff assignments.

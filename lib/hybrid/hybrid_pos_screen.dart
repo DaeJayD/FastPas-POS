@@ -57,6 +57,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
   BuildContext? _paymentDialog;
   bool _syncing = false;
   bool _allowed = false;
+  String? _deviceId;
   String _status = 'Opening saved store…';
 
   @override
@@ -78,6 +79,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
             _search.clear();
             _category = null;
             _allowed = false;
+            _deviceId = null;
             _status = 'Account changed. Return to your businesses.';
           });
         }
@@ -106,6 +108,10 @@ class _HybridPosScreenState extends State<HybridPosScreen>
         return;
       }
       _store = store;
+      final device = await store.deviceId;
+      if (mounted && widget.client.auth.currentUser?.id == store.userId) {
+        _deviceId = device;
+      }
       await _load();
       if (mounted) setState(() => _busy = false);
       await _sync();
@@ -605,6 +611,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
             onCategory: (value) => setState(() => _category = value),
             onQuantity: _changeQuantity,
             status: _status,
+            deviceId: _deviceId,
             pending: pending,
             blocked: blocked,
             busy: _busy,
