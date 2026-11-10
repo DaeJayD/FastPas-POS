@@ -13,7 +13,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Development schema deployed; hosted account/API checks passed; Phase 5 phone acceptance pending |
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Slices 6A–6D implemented locally; final acceptance and earlier phone/email/callback gates remain |
 | 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Returns and shift workflows implemented. Hosted and device acceptance remain open. |
-| 8. Reports | Reconciled reports, exports, and optional attendance | Planned |
+| 8. Reports | Reconciled reports, exports, and optional attendance | Branch cash reports and CSV implemented. Hosted and device acceptance remain open. |
 | 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale development slice implemented; wider sync and device acceptance planned |
 | 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
 
@@ -147,3 +147,11 @@ Open **Cash shift** in the branch selling screen, enter the opening float and re
 The close shows expected cash, counted cash and variance. Expected cash is opening float plus synced sale totals and cash in, less recorded refunds and cash out. The app requires resolution of linked pending or blocked receipts and saved return requests before closing. A saved shift request survives a lost reply and holds new checkout until it is resolved. Closing freezes the ledger totals and a late new receipt for that drawer goes to review. Older receipts without an assigned shift can still sync.
 
 Apply the cash returns and cash shifts migrations in order on the development project before running the hosted and [device checks](DEVICE_ACCEPTANCE.md#phase-7-installed-device-checks).
+
+## Phase 8 branch cash reports
+
+Owners and assigned managers can open **Cash reports**, select a branch, choose a date range of up to 93 days and save the displayed daily figures to CSV. The initial report covers the last seven days in `Asia/Manila`. Enter a different IANA time zone to report in the branch's local calendar.
+
+The report assigns synced sales to their occurrence date, refunds to the date recorded and drawer reconciliation to the date the shift closed. Gross sales less refunds gives net cash sales. Drawer expected cash, counted cash and variance are reported separately. Older sales can appear after their devices sync. The report does not yet include optional attendance.
+
+Local validation passed 193 Flutter tests, 39 backend test groups and static analysis. Coverage includes exact CSV amounts, the workspace report route, late replies after account changes, branch permissions and daylight-saving boundaries. The reporting migration follows the returns and shifts migrations. Hosted authorization and installed-device CSV checks remain pending.

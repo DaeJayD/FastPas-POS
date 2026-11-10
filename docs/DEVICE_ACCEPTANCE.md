@@ -145,3 +145,7 @@ After applying migrations eight and nine to the development project, use a test 
 | Drawer reconciliation | Open with ₱100, make a ₱75 sale with ₱100 tender, record a ₱25 refund, add ₱10 and remove ₱5. Close with ₱154.50 counted. | Expected cash is ₱155.00. The displayed variance is −₱0.50, and the reasons appear in recent movements. |
 | Offline sale and close | Open a shift online, go offline, take a sale, reopen the app and reconnect. Attempt close before and after syncing. | The receipt keeps its shift ID, close waits for upload, and the sale counts once. |
 | Lost shift reply and role scope | Interrupt an opening, movement or close response and retry from the same account after reopening. Switch accounts and try a different branch/device. | The original request resolves once. Other accounts and devices cannot read or post to that drawer. |
+
+## Phase 8 installed-device checks
+
+After applying migration ten to the development project, run **Cash reports** on a test branch as an owner or assigned manager. Check a period that contains a sale, a refund recorded on a later local day and a closed drawer with a variance. Verify the amounts and dates on screen, then save and open the CSV on the phone. Each daily row should match the screen and the receipt or closing records. Check a different branch and time zone, then switch accounts during a refresh and verify the old report clears. These checks remain pending.

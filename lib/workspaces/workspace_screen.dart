@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/fastpas_theme.dart';
 import '../hybrid/hybrid_pos_screen.dart';
+import '../reports/branch_cash_report.dart';
+import '../reports/branch_cash_report_screen.dart';
 import 'workspace_repository.dart';
 import 'staff_access_screen.dart';
 import 'workspace_account.dart';
@@ -574,6 +576,36 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       ),
                     ),
                   if (_selected != null) ...[
+                    if (['owner', 'manager'].contains(_selected!.role))
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.bar_chart_outlined),
+                        label: const Text('Cash reports'),
+                        onPressed: _busy || _branches.isEmpty
+                            ? null
+                            : () => _run(() async {
+                                final actor =
+                                    widget.client.auth.currentUser?.id;
+                                if (actor == null) return;
+                                final repository = BranchCashReportRepository(
+                                  widget.client,
+                                  _selected!.id,
+                                  actor,
+                                );
+                                final branches =
+                                    List<WorkspaceBranch>.unmodifiable(
+                                      _branches,
+                                    );
+                                await Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BranchCashReportScreen(
+                                      repository: repository,
+                                      branches: branches,
+                                    ),
+                                  ),
+                                );
+                              }),
+                      ),
                     if (_selected!.role == 'owner')
                       OutlinedButton.icon(
                         icon: const Icon(Icons.inventory_2_outlined),

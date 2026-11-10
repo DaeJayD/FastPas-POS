@@ -67,6 +67,7 @@ before(async () => {
   for(const check of conflicts.rows) assert.equal(check.passed,true,check.function_name);
   await db.exec(await readFile(new URL('../migrations/202611100001_cash_returns.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../migrations/202611100002_cash_shifts.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202611100003_branch_cash_report.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 beforeEach(async () => {
@@ -371,4 +372,68 @@ test('shift accounting is scoped to cashier and device and never relinks an earl
   await rpc('pos_record_cash_return',refund);
   await reject(()=>rpc('pos_record_shift_return',{...refund,...scope,p_shift:drawer.id}),'PT409');
   assert.deepEqual(await rpc('pos_cash_shift_status',scope),drawer);
+});
+
+const report = (from,through,extra={}) => rpc('pos_branch_cash_report',{
+  p_business:business,p_branch:branch,p_from:from,p_through:through,p_timezone:'Asia/Manila',...extra,
+});
+
+test('reports use sale and refund event dates and show closed drawer counts separately',async()=>{
+  const scope={p_business:business,p_branch:branch,p_device:randomUUID()};
+  const drawer=await rpc('pos_open_cash_shift',{...scope,p_request:randomUUID(),p_opening:10000});
+  const sale={id:randomUUID(),business_id:business,branch_id:branch,device_id:scope.p_device,
+    cash_shift_id:drawer.id,occurred_at:'2026-11-01T15:59:59Z',cash_cents:10000,items:[waterLine()]};
+  await rpc('pos_sync_cash_sale',{sale});
+  await rpc('pos_sync_cash_sale',{sale});
+  const refund=returnRequest(sale.id,[returnLine(1,false)]);
+  await rpc('pos_record_shift_return',{...refund,...scope,p_shift:drawer.id});
+  await rpc('pos_close_cash_shift',{...scope,p_shift:drawer.id,p_request:randomUUID(),p_counted:14900});
+  await db.exec('reset role');
+  await db.query("update fastpas_private.cash_returns set created_at='2026-11-01T16:00:00Z' where id=$1",[refund.p_request]);
+  await db.query("update fastpas_private.cash_shifts set closed_at='2026-11-01T16:00:01Z' where id=$1",[drawer.id]);
+  await identity();
+  const result=await report('2026-11-01','2026-11-03');
+  assert.deepEqual(result.days.map(row=>[row.day,row.sale_count,row.gross_cents,row.refund_count,
+    row.refund_cents,row.shift_count,row.expected_cents,row.counted_cents]),[
+    ['2026-11-01',1,7500,0,0,0,0,0],
+    ['2026-11-02',0,0,1,2500,1,15000,14900],
+    ['2026-11-03',0,0,0,0,0,0,0],
+  ]);
+  assert.equal(result.branch_id,branch);
+  assert.ok((await report('2026-11-01','2026-11-03',{p_branch:destination})).days.every(row=>row.sale_count===0&&row.refund_count===0));
+});
+
+test('reports use local midnight boundaries through a daylight-saving transition',async()=>{
+  for (const occurred_at of ['2026-03-08T04:59:59Z','2026-03-08T05:00:00Z',
+    '2026-03-09T03:59:59Z','2026-03-09T04:00:00Z']) {
+    await rpc('pos_sync_cash_sale',{sale:{id:randomUUID(),business_id:business,branch_id:branch,
+      device_id:randomUUID(),occurred_at,cash_cents:2500,items:[{...waterLine(),quantity:1}]}});
+  }
+  const result=await report('2026-03-08','2026-03-08',{p_timezone:'America/New_York'});
+  assert.equal(result.days[0].sale_count,2);
+  assert.equal(result.days[0].gross_cents,5000);
+  for (const occurred_at of ['2024-11-03T04:15:00Z','2024-11-03T05:15:00Z']) {
+    await rpc('pos_sync_cash_sale',{sale:{id:randomUUID(),business_id:business,branch_id:branch,
+      device_id:randomUUID(),occurred_at,cash_cents:2500,items:[{...waterLine(),quantity:1}]}});
+  }
+  const repeated=await report('2024-11-03','2024-11-03',{p_timezone:'America/Havana'});
+  assert.equal(repeated.days[0].sale_count,2);
+});
+
+test('cash report enforces branch permissions and valid date ranges and zones',async()=>{
+  await reject(()=>report('2026-01-01','2026-12-31'),'22023');
+  await reject(()=>report('2026-01-02','2026-01-01'),'22023');
+  await reject(()=>report(null,'2026-01-01'),'22023');
+  await reject(()=>report('2026-01-01','2026-01-01',{p_timezone:'+10'}),'22023');
+  await reject(()=>report('2026-01-01','2026-01-01',{p_branch:otherBranch}),'42501');
+  assert.equal((await report(null,null)).days.length,7);
+  for(const [actor,role] of [['','anon'],[staff,'authenticated'],[other,'authenticated']]) {
+    await identity(actor,role);
+    await reject(()=>report(null,null),'42501');
+  }
+  await identity();
+  await rpc('pos_change_staff_access',{business,member:staff,new_role:'manager'});
+  await identity(staff);
+  assert.equal((await report(null,null)).days.length,7);
+  await reject(()=>report(null,null,{p_branch:destination}),'42501');
 });
