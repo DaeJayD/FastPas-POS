@@ -144,6 +144,13 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                       ),
                     ),
                   ),
+                if (row['status'] == 'pending' && row['retry_after_ms'] != null)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'Sync now can retry this receipt before the automatic wait ends.',
+                    ),
+                  ),
                 SelectableText(
                   receiptText(
                     jsonDecode(row['payload'] as String)

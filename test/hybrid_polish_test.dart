@@ -849,7 +849,13 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(find.text('Sale saved on this device'), findsOneWidget);
-      expect(find.textContaining('Change ₱5.00'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is SelectableText &&
+              (widget.data?.contains('Change ₱5.00') ?? false),
+        ),
+        findsOneWidget,
+      );
       expect((await tester.runAsync(store.receipts))!.length, 1);
       expect(tester.takeException(), isNull);
     } finally {

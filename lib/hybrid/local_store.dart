@@ -34,7 +34,7 @@ class LocalStore {
         // A previous route may finish an upload after this branch is reopened.
         // Each visit owns its connection; closing one must not close another.
         singleInstance: false,
-        version: 2,
+        version: 3,
         onCreate: (db, _) async {
           await db.execute(
             'CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
@@ -43,7 +43,7 @@ class LocalStore {
             "CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT NOT NULL, price_cents INTEGER NOT NULL, quantity INTEGER NOT NULL, category_id TEXT NOT NULL DEFAULT '', category_name TEXT NOT NULL DEFAULT '')",
           );
           await db.execute(
-            "CREATE TABLE sales (id TEXT PRIMARY KEY, payload TEXT NOT NULL, total_cents INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', error TEXT)",
+            "CREATE TABLE sales (id TEXT PRIMARY KEY, payload TEXT NOT NULL, total_cents INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', error TEXT, upload_attempts INTEGER NOT NULL DEFAULT 0, retry_after_ms INTEGER)",
           );
           await db.execute('CREATE INDEX sales_status ON sales(status)');
         },
@@ -57,12 +57,23 @@ class LocalStore {
             );
             await db.execute('CREATE INDEX sales_status ON sales(status)');
           }
+          if (oldVersion < 3) {
+            await db.execute(
+              'ALTER TABLE sales ADD COLUMN upload_attempts INTEGER NOT NULL DEFAULT 0',
+            );
+            await db.execute(
+              'ALTER TABLE sales ADD COLUMN retry_after_ms INTEGER',
+            );
+          }
         },
       ),
     );
     final store = LocalStore._(db, userId, businessId, branchId);
     if (await store.meta('device_id') == null) {
-      await store.setMeta('device_id', WorkspaceRepository.newRequestId());
+      await db.insert('metadata', {
+        'key': 'device_id',
+        'value': WorkspaceRepository.newRequestId(),
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     return store;
   }
@@ -271,12 +282,48 @@ class LocalStore {
     );
   }
 
-  Future<List<Map<String, Object?>>> pendingReceipts() => db.query(
+  Future<List<Map<String, Object?>>> pendingReceipts({int? limit}) => db.query(
     'sales',
     where: 'status = ?',
     whereArgs: ['pending'],
     orderBy: 'rowid',
+    limit: limit,
   );
+
+  Future<bool> hasPendingReceipts() async => (await db.query(
+    'sales',
+    columns: ['id'],
+    where: 'status = ?',
+    whereArgs: ['pending'],
+    limit: 1,
+  )).isNotEmpty;
+
+  Future<void> deferUpload(String id, int attempts, DateTime retryAfter) async {
+    await db.update(
+      'sales',
+      {
+        'upload_attempts': attempts,
+        'retry_after_ms': retryAfter.millisecondsSinceEpoch,
+        'error':
+            'Upload not confirmed. The original receipt is saved for retry.',
+      },
+      where: "id = ? AND status = 'pending'",
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> finishUpload(String id, {String? reviewReason}) async {
+    await db.update(
+      'sales',
+      {
+        'status': reviewReason == null ? 'synced' : 'blocked',
+        'error': reviewReason,
+        'retry_after_ms': null,
+      },
+      where: "id = ? AND status = 'pending'",
+      whereArgs: [id],
+    );
+  }
 
   Future<Map<String, Object?>> receipt(String id) async => (await db.query(
     'sales',
@@ -491,7 +538,7 @@ class LocalStore {
     }
     await db.update(
       'sales',
-      {'status': status, 'error': error},
+      {'status': status, 'error': error, 'retry_after_ms': null},
       where: 'id = ?',
       whereArgs: [id],
     );

@@ -22,13 +22,20 @@ void main() {
   late LocalStore store;
   late SupabaseClient client;
   var received = <Map<String, dynamic>>[];
+  var committed = <String, int>{};
+  var stockReads = 0;
   var loseFirstReply = false;
+  var denyUploadAccess = false;
+  var wrongAcknowledgment = false;
+  var pagedCatalog = false;
   var membershipRevoked = false;
   var branchRevoked = false;
   var denySale = false;
   var offline = false;
   var denyDirectory = false;
   Completer<void>? stockRequested, releaseStock;
+  Completer<void>? uploadRequested, releaseUpload;
+  String? uploadAuthorization;
   var revokeDuringCatalog = false;
   Future<void> restoreIdentity(String id) async {
     String encode(Object data) =>
@@ -57,7 +64,12 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     received = [];
+    committed = {};
+    stockReads = 0;
     loseFirstReply = false;
+    denyUploadAccess = false;
+    wrongAcknowledgment = false;
+    pagedCatalog = false;
     membershipRevoked = false;
     branchRevoked = false;
     denySale = false;
@@ -65,6 +77,9 @@ void main() {
     denyDirectory = false;
     stockRequested = null;
     releaseStock = null;
+    uploadRequested = null;
+    releaseUpload = null;
+    uploadAuthorization = null;
     revokeDuringCatalog = false;
     directory = await Directory.systemTemp.createTemp('fastpas-sync-');
     store = await LocalStore.open(
@@ -124,8 +139,13 @@ void main() {
               (jsonDecode(request.body) as Map<String, dynamic>)['sale']
                   as Map<String, dynamic>;
           received.add(payload);
-          if (loseFirstReply && received.length == 1) {
-            throw http.ClientException('Reply lost');
+          if (denyUploadAccess) {
+            return http.Response(
+              jsonEncode({'code': '42501', 'message': 'Access denied'}),
+              403,
+              request: request,
+              headers: {'content-type': 'application/json'},
+            );
           }
           if (denySale) {
             return http.Response(
@@ -135,30 +155,78 @@ void main() {
               headers: {'content-type': 'application/json'},
             );
           }
-          response = payload['id'];
+          committed.putIfAbsent(
+            payload['id'] as String,
+            () => (payload['items'] as List).fold<int>(
+              0,
+              (sum, item) => sum + (item['quantity'] as int),
+            ),
+          );
+          if (loseFirstReply && received.length == 1) {
+            throw http.ClientException('Reply lost');
+          }
+          uploadAuthorization = request.headers['authorization'];
+          uploadRequested?.complete();
+          if (releaseUpload != null) await releaseUpload!.future;
+          response = wrongAcknowledgment ? 'different-receipt' : payload['id'];
         } else if (route.endsWith('/pos_item_stock')) {
-          stockRequested?.complete();
+          stockReads++;
+          if (stockRequested case final signal? when !signal.isCompleted) {
+            signal.complete();
+          }
+          final quantity =
+              5 - committed.values.fold(0, (sum, amount) => sum + amount);
           if (releaseStock != null) await releaseStock!.future;
           if (revokeDuringCatalog) membershipRevoked = true;
-          response = [
-            {
-              'product_id': 'p1',
-              'quantity': received.isEmpty || denySale ? 5 : 3,
-              'pos_items': {
-                'id': 'p1',
-                'name': 'Coffee',
-                'sku': 'COF',
-                'price_cents': 100,
-                'active': true,
-                if ((request.url.queryParameters['select'] ?? '').contains(
-                  'pos_categories',
-                )) ...{
-                  'category_id': 'drinks',
-                  'category': {'name': 'Drinks'},
+          if (pagedCatalog) {
+            final params = request.url.queryParameters;
+            final cursor = params['product_id']?.substring(3);
+            final offset = int.tryParse(params['offset'] ?? '') ?? 0;
+            final limit = int.tryParse(params['limit'] ?? '') ?? 500;
+            final ids = [
+              if (stockReads > 1) 'item-000',
+              for (var i = 1; i <= 501; i++)
+                'item-${i.toString().padLeft(3, '0')}',
+            ];
+            response = ids
+                .where((id) => cursor == null || id.compareTo(cursor) > 0)
+                .skip(offset)
+                .take(limit)
+                .map(
+                  (id) => {
+                    'product_id': id,
+                    'quantity': 1,
+                    'pos_items': {
+                      'id': id,
+                      'name': id,
+                      'sku': id,
+                      'price_cents': 100,
+                      'active': true,
+                    },
+                  },
+                )
+                .toList();
+          } else {
+            response = [
+              {
+                'product_id': 'p1',
+                'quantity': quantity,
+                'pos_items': {
+                  'id': 'p1',
+                  'name': 'Coffee',
+                  'sku': 'COF',
+                  'price_cents': 100,
+                  'active': true,
+                  if ((request.url.queryParameters['select'] ?? '').contains(
+                    'pos_categories',
+                  )) ...{
+                    'category_id': 'drinks',
+                    'category': {'name': 'Drinks'},
+                  },
                 },
               },
-            },
-          ];
+            ];
+          }
         } else {
           throw StateError('Unexpected request $route');
         }
@@ -196,21 +264,142 @@ void main() {
     },
   );
 
-  test('Lost acknowledgement retries the same business-bound sale without double local deduction', () async {
+  test('Lost acknowledgment waits across reopen, then retries the same receipt without double deduction', () async {
     final id = await store.checkout({'p1': 2}, 200);
+    var now = DateTime.now();
     loseFirstReply = true;
     await expectLater(
-      SyncService(client, store).synchronize(),
+      SyncService(client, store, clock: () => now).synchronize(),
       throwsA(isA<http.ClientException>()),
     );
-    expect((await store.receipts()).single['status'], 'pending');
-    await SyncService(client, store).synchronize();
+    await store.close();
+    store = await LocalStore.open(
+      userId: user,
+      businessId: business,
+      branchId: branch,
+      directory: directory.path,
+      factory: databaseFactoryFfi,
+    );
+    final pending = await store.receipt(id);
+    expect(pending['status'], 'pending');
+    expect(pending['upload_attempts'], 1);
+    expect(
+      pending['retry_after_ms'],
+      now.add(const Duration(seconds: 30)).millisecondsSinceEpoch,
+    );
+    final sync = SyncService(client, store, clock: () => now);
+    expect(await sync.synchronize(), SyncOutcome.waiting);
+    expect(received, hasLength(1));
+    expect(stockReads, 0);
+    expect((await store.products()).single['quantity'], 3);
+    now = now.add(const Duration(seconds: 30));
+    expect(await sync.synchronize(), SyncOutcome.synchronized);
     expect(received.length, 2);
     expect(received.first, received.last);
     expect(received.last['id'], id);
     expect(received.last['business_id'], business);
     expect((await store.receipts()).single['status'], 'synced');
     expect((await store.products()).single['quantity'], 3);
+  });
+
+  test('Manual sync bypasses the wait, but an access denial keeps an ambiguous sale pending', () async {
+    final id = await store.checkout({'p1': 2}, 200);
+    final now = DateTime.now();
+    final sync = SyncService(client, store, clock: () => now);
+    loseFirstReply = true;
+    await expectLater(sync.synchronize(), throwsA(isA<http.ClientException>()));
+    denyUploadAccess = true;
+    await expectLater(
+      sync.synchronize(force: true),
+      throwsA(isA<PostgrestException>()),
+    );
+    final pending = await store.receipt(id);
+    expect(pending['status'], 'pending');
+    expect(pending['upload_attempts'], 2);
+    expect(
+      pending['retry_after_ms'],
+      now.add(const Duration(seconds: 60)).millisecondsSinceEpoch,
+    );
+    expect(stockReads, 0);
+    denyUploadAccess = false;
+    await sync.synchronize(force: true);
+    expect(received, hasLength(3));
+    expect(
+      received.every(
+        (payload) => jsonEncode(payload) == jsonEncode(received.first),
+      ),
+      isTrue,
+    );
+    expect((await store.receipt(id))['status'], 'synced');
+    expect((await store.products()).single['quantity'], 3);
+  });
+
+  test(
+    'A different server acknowledgment cannot clear a pending sale',
+    () async {
+      final id = await store.checkout({'p1': 1}, 100);
+      wrongAcknowledgment = true;
+      await expectLater(
+        SyncService(client, store).synchronize(),
+        throwsStateError,
+      );
+      expect((await store.receipt(id))['status'], 'pending');
+      expect(stockReads, 0);
+      wrongAcknowledgment = false;
+      await SyncService(client, store).synchronize(force: true);
+      expect((await store.receipt(id))['status'], 'synced');
+      expect((await store.products()).single['quantity'], 4);
+    },
+  );
+
+  test(
+    'Sync uses bounded FIFO batches and refreshes stock after the queue drains',
+    () async {
+      final product = Map<String, Object?>.of((await store.products()).single)
+        ..['quantity'] = 50;
+      await store.replaceSnapshot([product], 'cashier');
+      final ids = [
+        for (var i = 0; i < 33; i++) await store.checkout({'p1': 1}, 100),
+      ];
+      final sync = SyncService(client, store);
+      expect(await sync.synchronize(), SyncOutcome.queued);
+      expect(received.map((sale) => sale['id']), ids.take(32));
+      expect(stockReads, 0);
+      expect((await store.pendingReceipts()).single['id'], ids.last);
+      expect(await sync.synchronize(), SyncOutcome.synchronized);
+      expect(received.map((sale) => sale['id']), ids);
+      expect(stockReads, 1);
+    },
+  );
+
+  test('Two branch visits cannot upload into an older visit’s in-flight catalog snapshot', () async {
+    await store.checkout({'p1': 2}, 200);
+    stockRequested = Completer<void>();
+    releaseStock = Completer<void>();
+    final first = SyncService(client, store).synchronize();
+    await stockRequested!.future;
+    final reopened = await LocalStore.open(
+      userId: user,
+      businessId: business,
+      branchId: branch,
+      directory: directory.path,
+      factory: databaseFactoryFfi,
+    );
+    try {
+      final next = await reopened.checkout({'p1': 1}, 100);
+      final second = SyncService(client, reopened).synchronize();
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+      expect(received, hasLength(1));
+      releaseStock!.complete();
+      expect(await first, SyncOutcome.queued);
+      expect(await second, SyncOutcome.synchronized);
+      expect(received.last['id'], next);
+      expect((await reopened.products()).single['quantity'], 2);
+    } finally {
+      if (!releaseStock!.isCompleted) releaseStock!.complete();
+      await first;
+      await reopened.close();
+    }
   });
   test('Server validation failure retains sale for review', () async {
     await store.checkout({'p1': 2}, 200);
@@ -237,6 +426,37 @@ void main() {
       SyncService(client, store).synchronize(),
       throwsStateError,
     );
+    expect(received, isEmpty);
+  });
+  test('A late upload reply updates only the original receipt and skips refresh after sign-in changes', () async {
+    final id = await store.checkout({'p1': 1}, 100);
+    final token = client.auth.currentSession!.accessToken;
+    uploadRequested = Completer<void>();
+    releaseUpload = Completer<void>();
+    final finished = expectLater(
+      SyncService(client, store).synchronize(),
+      throwsStateError,
+    );
+    await uploadRequested!.future;
+    try {
+      await restoreIdentity('10000000-0000-4000-8000-000000000002');
+    } finally {
+      releaseUpload!.complete();
+    }
+    await finished;
+    expect(uploadAuthorization, 'Bearer $token');
+    expect((await store.receipt(id))['status'], 'synced');
+    expect(stockReads, 0);
+  });
+  test('Explicit branch verification denial stops offline sales and leaves uploads pending', () async {
+    final id = await store.checkout({'p1': 1}, 100);
+    denyDirectory = true;
+    await expectLater(
+      SyncService(client, store).synchronize(),
+      throwsA(isA<PostgrestException>()),
+    );
+    expect(await store.canSell(), isFalse);
+    expect((await store.receipt(id))['status'], 'pending');
     expect(received, isEmpty);
   });
   test('Branch-only revocation disables selling and retains the original pending receipt', () async {
@@ -320,4 +540,15 @@ void main() {
       expect(await store.canSell(), isFalse);
     },
   );
+  test('Catalog cursor avoids duplicate rows when stock is inserted before the next page', () async {
+    pagedCatalog = true;
+    await SyncService(client, store).synchronize();
+    final products = await store.products();
+    expect(stockReads, 2);
+    expect(products, hasLength(501));
+    expect(products.first['id'], 'item-001');
+    expect(products.last['id'], 'item-501');
+    await SyncService(client, store).synchronize();
+    expect((await store.products()).first['id'], 'item-000');
+  });
 }

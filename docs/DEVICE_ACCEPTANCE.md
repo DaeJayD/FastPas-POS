@@ -149,3 +149,7 @@ After applying migrations eight and nine to the development project, use a test 
 ## Phase 8 installed-device checks
 
 After applying migration ten to the development project, run **Cash reports** on a test branch as an owner or assigned manager. Check a period that contains a sale, a refund recorded on a later local day and a closed drawer with a variance. Verify the amounts and dates on screen, then save and open the CSV on the phone. Each daily row should match the screen and the receipt or closing records. Check a different branch and time zone, then switch accounts during a refresh and verify the old report clears. These checks remain pending.
+
+## Phase 9 installed-device checks
+
+Update an existing test install with a pending cash sale, preserving app data. SQLite version 3 opens both earlier layouts. Record an offline sale and interrupt the first upload reply. Reopen the same branch and verify the receipt still has its original ID, amount, and local stock deduction. After reconnecting, use **Sync now** or wait for the next eligible pass. Verify that one cloud receipt exists and stock was deducted once. Reopen the branch while a sync is in progress and repeat on a second device with a separate signed-in account. Confirm that branch and account changes keep each device's queued receipts in their original scope. These checks remain pending.

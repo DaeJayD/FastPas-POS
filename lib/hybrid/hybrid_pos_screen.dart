@@ -139,9 +139,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
     }
   }
 
-  void _startSync() {
+  void _startSync({bool force = false}) {
     if (_busy || _syncing || _store == null || !mounted) return;
-    _operation = _sync();
+    _operation = _sync(force: force);
   }
 
   @override
@@ -149,29 +149,44 @@ class _HybridPosScreenState extends State<HybridPosScreen>
     if (state == AppLifecycleState.resumed) _startSync();
   }
 
-  Future<void> _sync() async {
+  Future<void> _sync({bool force = false}) async {
     if (_busy || _syncing || _store == null || !mounted) return;
     setState(() {
       _syncing = true;
       _status = 'Syncing…';
     });
     try {
+      var outcome = SyncOutcome.synchronized;
       if (widget.synchronize != null) {
         await widget.synchronize!(_store!);
       } else {
-        await SyncService(
+        outcome = await SyncService(
           widget.client,
           _store!,
           isActive: () => mounted,
-        ).synchronize();
+        ).synchronize(force: force);
       }
-      if (mounted) setState(() => _status = 'Connected · changes synchronized');
+      if (mounted) {
+        setState(
+          () => _status = switch (outcome) {
+            SyncOutcome.synchronized => 'Connected · changes synchronized',
+            SyncOutcome.queued => 'Sales saved · more uploads waiting',
+            SyncOutcome.waiting => 'Sales saved · waiting to retry upload',
+          },
+        );
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _status = 'Not synchronized · using saved data');
       }
     } finally {
-      if (mounted) await _load();
+      try {
+        if (mounted) await _load();
+      } catch (_) {
+        if (mounted) {
+          setState(() => _status = 'Could not refresh saved store data');
+        }
+      }
       if (mounted) {
         setState(() {
           _syncing = false;
@@ -420,7 +435,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
               widget.business.role == 'owner' ||
               widget.business.role == 'manager',
           onSync: () async {
-            _startSync();
+            _startSync(force: true);
             await _operation;
           },
         ),
@@ -446,7 +461,7 @@ class _HybridPosScreenState extends State<HybridPosScreen>
           return CashShiftDialog(
             repository: CashShiftRepository(widget.client, store),
             onSync: () async {
-              _startSync();
+              _startSync(force: true);
               await _operation;
             },
           );
@@ -570,7 +585,9 @@ class _HybridPosScreenState extends State<HybridPosScreen>
               icon: const Icon(Icons.receipt_long_outlined),
             ),
             IconButton(
-              onPressed: _busy || _syncing ? null : _startSync,
+              onPressed: _busy || _syncing
+                  ? null
+                  : () => _startSync(force: true),
               tooltip: 'Sync now',
               icon: const Icon(Icons.sync),
             ),

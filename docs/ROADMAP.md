@@ -14,7 +14,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Slices 6A–6D implemented locally; final acceptance and earlier phone/email/callback gates remain |
 | 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Returns and shift workflows implemented. Hosted and device acceptance remain open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Branch cash reports and CSV implemented. Hosted and device acceptance remain open. |
-| 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale development slice implemented; wider sync and device acceptance planned |
+| 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale retry and stock refresh hardened. Device registration and multi-device acceptance remain open. |
 | 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
 
 ## Current interface
@@ -155,3 +155,9 @@ Owners and assigned managers can open **Cash reports**, select a branch, choose 
 The report assigns synced sales to their occurrence date, refunds to the date recorded and drawer reconciliation to the date the shift closed. Gross sales less refunds gives net cash sales. Drawer expected cash, counted cash and variance are reported separately. Older sales can appear after their devices sync. The report does not yet include optional attendance.
 
 Local validation passed 193 Flutter tests, 39 backend test groups and static analysis. Coverage includes exact CSV amounts, the workspace report route, late replies after account changes, branch permissions and daylight-saving boundaries. The reporting migration follows the returns and shifts migrations. Hosted authorization and installed-device CSV checks remain pending.
+
+## Phase 9A offline cash-sale recovery
+
+The cash-sale queue uploads in bounded batches and persists retry timing in SQLite version 3. Lost or mismatched acknowledgments retain the original payload and device ID. Sync now can retry early. One sync operation per local store keeps a second branch visit from uploading into an older visit's stock refresh. Catalog paging follows product IDs, and the previous snapshot stays in place while an upload remains unconfirmed. Local upgrades from versions 1 and 2 preserve pending receipts and stock deductions.
+
+Device registration, broader offline operations and independent two-device acceptance remain open. Follow the [Phase 9 device checks](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) for the cash-sale queue.

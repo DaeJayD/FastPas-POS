@@ -18,6 +18,10 @@ Owners can now change an employee's branch assignments while retaining membershi
 
 Sync runs on opening the branch, app resume, every 30 seconds while open, and Sync now. It does not block cash checkout and is not a guaranteed OS background job after closing the app. Requests have bounded timeouts. Lost responses retry the same receipt UUID and payload; the server atomically saves each sale and deducts stock once.
 
+Phase 9A uploads up to 32 pending receipts in order on each pass. Failed uploads wait 30 seconds on the first failure, with longer waits capped at five minutes. SQLite version 3 stores the attempt count and wait across app restarts. **Sync now** can try a receipt before that wait expires. A receipt becomes synced only when the server acknowledges its exact ID. Access denials during upload keep the receipt pending so it can be verified after access is restored. Other definitive receipt conflicts stay in **Needs review**.
+
+Two visits to the same local store serialize upload and stock refresh. While an upload is unconfirmed, the app keeps the previous stock snapshot and its local deductions. Catalog paging uses a product cursor so inserts before the cursor do not repeat rows. An item inserted before the cursor appears on the next complete refresh.
+
 The current Saved receipts list reads the local account/branch database. It does not download receipt history from other devices. Other enrolled devices refresh catalog and stock from the server; shared receipt reporting remains planned.
 
 Phase 6 separates receipt history from Home and reads it in cursor pages of summaries; opening detail loads one original payload. Home refresh reads grouped status counts. SQLite version 2 adds cached categories and a receipt-status index without changing saved sale payloads. The populated version-1 upgrade is tested. Product search/category filters work from the cached snapshot and keep cart selections. See [workspace sales](SALES.md) for cash review, quote revalidation and local retry behavior.
