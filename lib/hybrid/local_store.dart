@@ -67,8 +67,14 @@ class LocalStore {
     return store;
   }
 
-  Future<String?> meta(String key) async {
-    final rows = await db.query('metadata', where: 'key = ?', whereArgs: [key]);
+  Future<String?> meta(String key) => _meta(db, key);
+
+  Future<String?> _meta(DatabaseExecutor database, String key) async {
+    final rows = await database.query(
+      'metadata',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
     return rows.isEmpty ? null : rows.first['value'] as String;
   }
 
@@ -84,9 +90,19 @@ class LocalStore {
   Future<String?> pendingCashReturn(String saleId) =>
       meta(_cashReturnKey(saleId));
 
-  Future<void> rememberCashReturn(String saleId, String request) async {
+  Future<String> rememberCashReturn(
+    String saleId,
+    Map<String, Object> params,
+  ) async {
     final key = _cashReturnKey(saleId);
-    await db.transaction((tx) async {
+    return db.transaction((tx) async {
+      await _requireDrawerReady(tx);
+      final shift = await _meta(tx, 'cash_shift_id');
+      final request = jsonEncode({
+        ...params,
+        if (shift != null) 'p_shift': shift,
+        if (shift != null) 'p_device': (await _meta(tx, 'device_id'))!,
+      });
       await tx.insert('metadata', {
         'key': key,
         'value': request,
@@ -101,6 +117,7 @@ class LocalStore {
           'Check the saved return request before starting another.',
         );
       }
+      return request;
     });
   }
 
@@ -110,6 +127,96 @@ class LocalStore {
       where: 'key = ? AND value = ?',
       whereArgs: [_cashReturnKey(saleId), request],
     );
+  }
+
+  Future<void> _requireDrawerReady(DatabaseExecutor database) async {
+    if (await _meta(database, 'cash_shift_request') != null) {
+      throw const FormatException(
+        'Resolve the saved request in Cash shift first.',
+      );
+    }
+  }
+
+  Future<String?> pendingCashShift() => meta('cash_shift_request');
+
+  Future<void> rememberCashShift(
+    String request, {
+    required String? activeShift,
+    required bool closing,
+  }) async {
+    await db.transaction((tx) async {
+      await _requireDrawerReady(tx);
+      if (await _meta(tx, 'cash_shift_id') != activeShift) {
+        throw const FormatException(
+          'Cash shift changed. Refresh and try again.',
+        );
+      }
+      if (closing) {
+        final unresolved = await tx.query(
+          'sales',
+          columns: ['payload'],
+          where: "status IN ('pending', 'blocked')",
+        );
+        if (unresolved.any(
+          (row) =>
+              (jsonDecode(row['payload'] as String) as Map)['cash_shift_id'] ==
+              activeShift,
+        )) {
+          throw const FormatException(
+            'Sync or resolve all receipts for this shift before closing.',
+          );
+        }
+      }
+      if (closing || activeShift == null) {
+        final returns = await tx.query(
+          'metadata',
+          columns: ['key'],
+          where: "key LIKE 'cash_return:%'",
+          limit: 1,
+        );
+        if (returns.isNotEmpty) {
+          throw const FormatException(
+            'Resolve the saved cash return before opening or closing a shift.',
+          );
+        }
+      }
+      await tx.insert('metadata', {
+        'key': 'cash_shift_request',
+        'value': request,
+      });
+    });
+  }
+
+  Future<void> updateCashShift(
+    String? activeShift, {
+    required String? previousShift,
+    String? completedRequest,
+  }) async {
+    await db.transaction((tx) async {
+      if (await _meta(tx, 'cash_shift_request') != completedRequest ||
+          await _meta(tx, 'cash_shift_id') != previousShift) {
+        return;
+      }
+      if (activeShift == null) {
+        await tx.delete(
+          'metadata',
+          where: 'key = ?',
+          whereArgs: ['cash_shift_id'],
+        );
+      } else {
+        await tx.insert('metadata', {
+          'key': 'cash_shift_id',
+          'value': activeShift,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      if (completedRequest != null) {
+        await tx.delete(
+          'metadata',
+          where: 'key = ?',
+          whereArgs: ['cash_shift_request'],
+        );
+      }
+    });
   }
 
   Future<List<Map<String, Object?>>> products() =>
@@ -291,6 +398,8 @@ class LocalStore {
       if (!await _canSell(tx, now: now)) {
         throw StateError('Connect to renew selling access.');
       }
+      await _requireDrawerReady(tx);
+      final cashShift = await _meta(tx, 'cash_shift_id');
       checkActive();
       final deviceRows = await tx.query(
         'metadata',
@@ -361,6 +470,7 @@ class LocalStore {
         'device_id': device,
         'occurred_at': (now ?? DateTime.now()).toUtc().toIso8601String(),
         'cash_cents': cashCents,
+        if (cashShift != null) 'cash_shift_id': cashShift,
         'items': items,
         if (details != null) 'receipt_details': details.toJson(),
       };

@@ -12,7 +12,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 4. Business setup | Business details, receipts, settings, and configurable branches | Implemented; earlier phone checks reported complete; hosted account/API checks passed |
 | 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Development schema deployed; hosted account/API checks passed; Phase 5 phone acceptance pending |
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Slices 6A–6D implemented locally; final acceptance and earlier phone/email/callback gates remain |
-| 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | 7A cash returns in local development. Hosted and device acceptance, cash movements, and shifts remain open. |
+| 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Returns and shift workflows implemented. Hosted and device acceptance remain open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Planned |
 | 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Cash-sale development slice implemented; wider sync and device acceptance planned |
 | 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
@@ -138,4 +138,12 @@ Owners and assigned managers can open **Cash return** from a synced receipt on t
 
 The eighth migration records each return separately from the original sale. Refund amounts use recorded sale prices. The database caps cumulative quantities per receipt line and commits the return, its lines and any stock movements together. The app saves the request on the device before sending it, so a lost reply can be retried after reopening the app with the same account and receipt.
 
-Local validation passed 189 Flutter tests and 34 backend test groups. The new tests cover returns at the original price, optional restocking, branch permissions, rollback, and recovery after reopening SQLite. Development deployment, concurrent hosted acceptance and installed-device checks are pending. Cash movements, cashier shifts and shift reconciliation are the next Phase 7 slice.
+Local validation passed 189 Flutter tests and 34 backend test groups for this slice. The new tests cover returns at the original price, optional restocking, branch permissions, rollback, and recovery after reopening SQLite. Development deployment, concurrent hosted acceptance and installed-device checks are pending.
+
+## Phase 7B cashier shifts
+
+Open **Cash shift** in the branch selling screen, enter the opening float and record cash added to or taken from the drawer with a reason. The shift belongs to the signed-in cashier, branch and device. Checkout attaches the active shift to receipts, including cash sales taken offline. Returns recorded from this drawer use its shift for the refund debit.
+
+The close shows expected cash, counted cash and variance. Expected cash is opening float plus synced sale totals and cash in, less recorded refunds and cash out. The app requires resolution of linked pending or blocked receipts and saved return requests before closing. A saved shift request survives a lost reply and holds new checkout until it is resolved. Closing freezes the ledger totals and a late new receipt for that drawer goes to review. Older receipts without an assigned shift can still sync.
+
+Apply the cash returns and cash shifts migrations in order on the development project before running the hosted and [device checks](DEVICE_ACCEPTANCE.md#phase-7-installed-device-checks).

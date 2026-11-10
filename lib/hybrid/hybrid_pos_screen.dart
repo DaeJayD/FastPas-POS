@@ -9,6 +9,8 @@ import '../core/fastpas_theme.dart';
 import '../workspaces/workspace_repository.dart';
 import 'cash_rules.dart';
 import 'cash_payment_dialog.dart';
+import 'cash_shift_dialog.dart';
+import 'cash_shift_repository.dart';
 import 'checkout_quote.dart';
 import 'local_store.dart';
 import 'sync_service.dart';
@@ -427,6 +429,34 @@ class _HybridPosScreenState extends State<HybridPosScreen>
     if (mounted && widget.client.auth.currentUser?.id == _userId) await _load();
   }
 
+  Future<void> _showCashShift() async {
+    final store = _store;
+    if (store == null ||
+        _busy ||
+        _paying ||
+        widget.client.auth.currentUser?.id != _userId) {
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          _paymentDialog = context;
+          return CashShiftDialog(
+            repository: CashShiftRepository(widget.client, store),
+            onSync: () async {
+              _startSync();
+              await _operation;
+            },
+          );
+        },
+      );
+    } finally {
+      _paymentDialog = null;
+    }
+  }
+
   Widget _cartBar() {
     final count = _cart.values.fold(0, (sum, quantity) => sum + quantity);
     return Container(
@@ -516,6 +546,18 @@ class _HybridPosScreenState extends State<HybridPosScreen>
             overflow: TextOverflow.ellipsis,
           ),
           actions: [
+            if (['owner', 'manager', 'cashier'].contains(widget.business.role))
+              IconButton(
+                onPressed:
+                    _store == null ||
+                        _busy ||
+                        _paying ||
+                        widget.client.auth.currentUser?.id != _userId
+                    ? null
+                    : _showCashShift,
+                tooltip: 'Cash shift',
+                icon: const Icon(Icons.point_of_sale_outlined),
+              ),
             IconButton(
               onPressed:
                   _store == null ||

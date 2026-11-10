@@ -48,6 +48,7 @@ class SyncService {
             '23503',
             '23514',
             '42501',
+            'PT409',
           ].contains(error.code)) {
             await store.setStatus(
               row['id'] as String,

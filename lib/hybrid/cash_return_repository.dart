@@ -69,13 +69,12 @@ class CashReturnRepository {
     List<Map<String, Object>> items,
   ) async {
     _checkAccount();
-    final request = jsonEncode({
+    final request = await store.rememberCashReturn(saleId, {
       ..._scope,
       'p_request': WorkspaceRepository.newRequestId(),
       'p_reason': reason,
       'p_items': items,
     });
-    await store.rememberCashReturn(saleId, request);
     return _submit(request);
   }
 
@@ -97,7 +96,12 @@ class CashReturnRepository {
     _checkAccount();
     try {
       final row = await client
-          .rpc('pos_record_cash_return', params: params)
+          .rpc(
+            params.containsKey('p_shift')
+                ? 'pos_record_shift_return'
+                : 'pos_record_cash_return',
+            params: params,
+          )
           .timeout(const Duration(seconds: 12));
       _checkAccount();
       final result = CashReturnResult(row as Map<String, dynamic>);

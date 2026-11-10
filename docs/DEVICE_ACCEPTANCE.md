@@ -134,3 +134,14 @@ Phase 6 profile APK built on 5 November 2026: 99,064,514 bytes; SHA-256 `43eaa28
 | Receipt history/reconnect | Open each status filter, detail and older pages where available. Restore internet and tap Sync now twice | Same receipt ID becomes synced once; quantities are not deducted twice; blocked receipts keep their original payload and review reason |
 | Account switch | Switch accounts with a payment or receipt detail open and while sync is finishing | Old detail/payment closes; old cart, search and receipt rows clear; access warning remains and stale controls cannot submit |
 | Layout/performance | Test larger system text and the keyboard on phone; open Home/history, change filters and navigate Back | Controls remain reachable and responsive. Record device/build, cold-start and navigation timings; local widget results are not phone timing measurements |
+
+## Phase 7 installed-device checks
+
+After applying migrations eight and nine to the development project, use a test branch and dedicated accounts. These checks are pending.
+
+| Check | Action | Pass condition |
+|---|---|---|
+| Partial return | As an owner or assigned manager, return a unit from a synced receipt after a price change. Repeat with and without restocking on separate units. | Refunds use the receipt price. Stock increases only for the restocked units. The original receipt remains intact. |
+| Drawer reconciliation | Open with ₱100, make a ₱75 sale with ₱100 tender, record a ₱25 refund, add ₱10 and remove ₱5. Close with ₱154.50 counted. | Expected cash is ₱155.00. The displayed variance is −₱0.50, and the reasons appear in recent movements. |
+| Offline sale and close | Open a shift online, go offline, take a sale, reopen the app and reconnect. Attempt close before and after syncing. | The receipt keeps its shift ID, close waits for upload, and the sale counts once. |
+| Lost shift reply and role scope | Interrupt an opening, movement or close response and retry from the same account after reopening. Switch accounts and try a different branch/device. | The original request resolves once. Other accounts and devices cannot read or post to that drawer. |

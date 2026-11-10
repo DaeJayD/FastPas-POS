@@ -66,6 +66,7 @@ before(async () => {
   assert.equal(conflicts.rows.length,5);
   for(const check of conflicts.rows) assert.equal(check.passed,true,check.function_name);
   await db.exec(await readFile(new URL('../migrations/202611100001_cash_returns.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../migrations/202611100002_cash_shifts.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 beforeEach(async () => {
@@ -309,4 +310,65 @@ test('returns reject invalid quantities, duplicate products, missing disposition
   await reject(()=>rpc('pos_record_cash_return',{...request,p_reason:'\t\n'}),'22023');
   assert.equal((await page())[0].quantity,7);
   assert.equal((await rpc('pos_cash_return_options',returnScope(sale)))[0].remaining_quantity,3);
+});
+
+test('cash shift reconciles net cash sales, refunds and movements once and freezes the closing count',async()=>{
+  const scope={p_business:business,p_branch:branch,p_device:randomUUID()};
+  const open={...scope,p_request:randomUUID(),p_opening:10000};
+  const drawer=await rpc('pos_open_cash_shift',open);
+  const shift={...scope,p_shift:drawer.id};
+  assert.deepEqual(await rpc('pos_open_cash_shift',open),drawer);
+  await reject(()=>rpc('pos_open_cash_shift',{...open,p_request:randomUUID()}),'PT409');
+
+  const sale={id:randomUUID(),business_id:business,branch_id:branch,device_id:scope.p_device,
+    cash_shift_id:drawer.id,occurred_at:new Date().toISOString(),cash_cents:10000,items:[waterLine()]};
+  await rpc('pos_sync_cash_sale',{sale});
+  await rpc('pos_sync_cash_sale',{sale});
+  await syncedSale([{...waterLine(),quantity:1}]); // Older clients still sync unassigned.
+  const refund={...returnRequest(sale.id,[returnLine(1,false)]),...shift};
+  await rpc('pos_record_shift_return',refund);
+  await rpc('pos_record_shift_return',refund);
+  const deposit={...shift,p_request:randomUUID(),p_cents:1000,p_reason:'Extra float'};
+  await rpc('pos_post_cash_movement',deposit);
+  await rpc('pos_post_cash_movement',deposit);
+  await reject(()=>rpc('pos_post_cash_movement',{...deposit,p_cents:-1000}),'PT409');
+  await rpc('pos_post_cash_movement',{...shift,p_request:randomUUID(),p_cents:-500,p_reason:'Cash pickup'});
+  const close={...shift,p_request:randomUUID(),p_counted:15450};
+  const closed=await rpc('pos_close_cash_shift',close);
+  assert.deepEqual(
+    [closed.sales_cents,closed.refunds_cents,closed.cash_in_cents,closed.cash_out_cents,closed.expected_cents,closed.variance_cents],
+    [7500,2500,1000,500,15500,-50],
+  );
+  assert.deepEqual(closed.recent_movements.map(({cents,reason})=>[cents,reason]).sort((a,b)=>a[0]-b[0]),
+    [[-500,'Cash pickup'],[1000,'Extra float']]);
+  assert.deepEqual(await rpc('pos_close_cash_shift',close),closed);
+  assert.deepEqual(await rpc('pos_cash_shift_status',scope),closed);
+  assert.deepEqual(await rpc('pos_post_cash_movement',deposit),closed);
+  await rpc('pos_record_shift_return',refund);
+  await rpc('pos_sync_cash_sale',{sale});
+  await reject(()=>rpc('pos_sync_cash_sale',{sale:{...sale,id:randomUUID()}}),'PT409');
+  await reject(()=>rpc('pos_record_shift_return',{...refund,p_request:randomUUID()}),'PT409');
+  await reject(()=>rpc('pos_post_cash_movement',{...deposit,p_request:randomUUID()}),'PT409');
+  await reject(()=>rpc('pos_close_cash_shift',{...close,p_counted:15500}),'PT409');
+  assert.equal((await page())[0].quantity,6);
+  assert.deepEqual(await rpc('pos_cash_shift_status',scope),closed);
+});
+
+test('shift accounting is scoped to cashier and device and never relinks an earlier refund',async()=>{
+  const scope={p_business:business,p_branch:branch,p_device:randomUUID()};
+  const drawer=await rpc('pos_open_cash_shift',{...scope,p_request:randomUUID(),p_opening:0});
+  const move={...scope,p_shift:drawer.id,p_request:randomUUID(),p_cents:100,p_reason:'Deposit'};
+  await reject(()=>rpc('pos_post_cash_movement',{...move,p_device:randomUUID()}),'42501');
+  await identity(staff);
+  assert.equal(await rpc('pos_cash_shift_status',scope),null);
+  await reject(()=>rpc('pos_post_cash_movement',move),'42501');
+  const staffDrawer=await rpc('pos_open_cash_shift',{...scope,p_request:randomUUID(),p_opening:25});
+  assert.notEqual(staffDrawer.id,drawer.id);
+  await reject(()=>rpc('pos_open_cash_shift',{...scope,p_branch:destination,p_request:randomUUID(),p_opening:0}),'42501');
+  await identity();
+  const receipt=await syncedSale();
+  const refund=returnRequest(receipt,[returnLine(1)]);
+  await rpc('pos_record_cash_return',refund);
+  await reject(()=>rpc('pos_record_shift_return',{...refund,...scope,p_shift:drawer.id}),'PT409');
+  assert.deepEqual(await rpc('pos_cash_shift_status',scope),drawer);
 });

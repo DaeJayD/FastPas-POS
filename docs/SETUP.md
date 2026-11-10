@@ -14,12 +14,13 @@ Create a Supabase project in your own account. Save its database password privat
 6. [Catalog and inventory](../supabase/migrations/202611030001_catalog_inventory.sql)
 7. [Non-retryable conflict responses](../supabase/migrations/202611040001_conflict_responses.sql)
 8. [Partial cash returns](../supabase/migrations/202611100001_cash_returns.sql)
+9. [Cash shifts and reconciliation](../supabase/migrations/202611100002_cash_shifts.sql)
 
 Each file has its own transaction. They create the new `pos_*` tables and functions; they are not scripts to rerun after successful installation. Record which files were applied. Do not create the old `employees`, `products`, or `sales` tables to make the legacy screens work.
 
 For an existing project, apply the missing migrations in order. The fourth adds branch reassignment and extends the Owner's staff listing. It preserves memberships and sales.
 
-The current development project has the first seven migrations applied through the SQL Editor. The fifth was added on 31 October 2026. The sixth and seventh were applied on 4 November 2026. All nine catalog deployment checks passed, and all five corrected conflict functions were read back from the deployed database. The eighth migration is staged for Phase 7A and still requires development deployment. Manual SQL execution leaves the CLI migration history empty. Before switching to CLI deployment, record verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). For projects missing the catalog or conflict migrations, follow the [catalog deployment procedure](CATALOG_INVENTORY.md#deployment-procedure).
+The current development project has the first seven migrations applied through the SQL Editor. The fifth was added on 31 October 2026. The sixth and seventh were applied on 4 November 2026. All nine catalog deployment checks passed, and all five corrected conflict functions were read back from the deployed database. Migrations eight and nine still require development deployment in order. Manual SQL execution leaves the CLI migration history empty. Before switching to CLI deployment, record verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). For projects missing the catalog or conflict migrations, follow the [catalog deployment procedure](CATALOG_INVENTORY.md#deployment-procedure).
 
 Keep `public` exposed through the Data API. Keep `fastpas_private` out of exposed schemas. Leave row-level security and the grants installed by the migrations in place. Business ownership is created through the app, using the authenticated account.
 
