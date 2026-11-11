@@ -22,7 +22,18 @@ Each file has its own transaction. They create the new `pos_*` tables and functi
 
 For an existing project, apply the missing migrations in order. The fourth adds branch reassignment and extends the Owner's staff listing. It preserves memberships and sales.
 
-The current development project has the first seven migrations applied through the SQL Editor. The fifth was added on 31 October 2026. The sixth and seventh were applied on 4 November 2026. All nine catalog deployment checks passed, and all five corrected conflict functions were read back from the deployed database. Migrations eight through eleven still require development deployment in order. Manual SQL execution leaves the CLI migration history empty. Before switching to CLI deployment, record verified versions as applied using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair). For projects missing the catalog or conflict migrations, follow the [catalog deployment procedure](CATALOG_INVENTORY.md#deployment-procedure).
+All eleven migrations are installed in the current development project. The first seven were applied through the SQL Editor, with the catalog and conflict migrations verified on 4 November 2026. Migrations eight through eleven were applied in order on 12 November 2026. Readback matched all eleven affected public function bodies to the repository source and verified their execution grants and private-table restrictions. Existing counts matched before and after deployment, including seven receipts and 43 stock units.
+
+The later migrations have the following hosted history entries. The first seven manual deployments have no history entries. Reconcile this history with the local migration filenames using [migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair) before a future CLI deployment.
+
+| Local migration | Hosted history version |
+|---|---|
+| `202611100001_cash_returns.sql` | `20261111174749` |
+| `202611100002_cash_shifts.sql` | `20261111174754` |
+| `202611100003_branch_cash_report.sql` | `20261111174758` |
+| `202611110001_selling_devices.sql` | `20261111174803` |
+
+Twenty-five read-only hosted checks passed using three distinct verified test accounts, covering report and device-list reads, anonymous and cross-business denial, private-schema exposure and rejection of write requests outside an authorized branch. The test sessions were closed. Concurrent returns and drawer workflows, registration writes and installed-device acceptance remain pending. For another project missing the catalog or conflict migrations, follow the [catalog deployment procedure](CATALOG_INVENTORY.md#deployment-procedure).
 
 Keep `public` exposed through the Data API. Keep `fastpas_private` out of exposed schemas. Leave row-level security and the grants installed by the migrations in place. Business ownership is created through the app, using the authenticated account.
 
