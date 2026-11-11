@@ -118,3 +118,17 @@ Keep hosted acceptance pending until the actual project run succeeds and its rep
 On 4 November 2026, the first hosted run reproduced a stale business edit that failed to return within 15 seconds; an isolated probe still timed out after 45 seconds. The functions used application-level SQLSTATE `40001`, which affected PostgREST versions retry as serialization failures. The seventh additive migration replaces those explicit domain errors in five functions with `PT409`, preserving their ownership checks, signatures, grants and data. The same hosted probe subsequently returned HTTP 409/code PT409 in 177 ms. Readback found five corrected functions and no active matching conflict probes. The client handles PT409 and retains compatibility with earlier 40001 responses.
 
 After the correction, all 123 hosted Auth/PostgREST checks passed with three distinct dedicated admin-confirmed accounts. Real concurrent sale/branch/transfer retries, tenant and role restrictions, revocation/restoration, immutable receipt branding, stock conservation and archive/restore checks passed. The report confirms all three test sessions were closed locally. Admin confirmation bypassed delivery for these test identities; SMTP/email verification links and native callbacks remain separate acceptance steps. The first failed run retained partial fixtures, and the successful run retained its documented fixtures. Both manifests and the generated credentials remain in ignored local configuration files.
+
+## Returns and cash shifts
+
+After migrations eight through ten are installed in the development project, use the same three verified accounts and test-write opt-in for the cash-workflow runner.
+
+```powershell
+node supabase/tests/cash_workflow_acceptance.mjs config/acceptance.local.json --write-fixtures
+```
+
+It creates a dedicated business, product and manager invitation. Each run records attempted request IDs and retains its fixtures in `config/cash-workflow-<run-id>.local.json`. Keep those local credentials and manifests outside Git.
+
+On 12 November 2026, all 19 hosted checks passed. Concurrent opening and sale retries resolved once. Two competing two-unit returns against a three-unit receipt allowed one return and rejected the excess with HTTP 409. Restocked units increased stock once across repeated refund requests, and a final refund without restocking preserved quantity.
+
+Concurrent drawer closes froze expected cash at ₱105.00, counted cash at ₱104.50 and variance at −₱0.50. Existing requests remained retryable after closing, while a new late sale was rejected with stock intact. The owner and assigned manager read the same reconciled daily report, and an unrelated owner was denied. All three test sessions closed. The [installed-device checks](DEVICE_ACCEPTANCE.md#phase-7-installed-device-checks) remain pending.

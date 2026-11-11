@@ -12,9 +12,9 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 4. Business setup | Business details, receipts, settings, and configurable branches | Implemented; earlier phone checks reported complete; hosted account/API checks passed |
 | 5. Catalog and inventory | Optional brands, categories, variants, receiving, adjustments, and stock transfers | Development schema deployed; hosted account/API checks passed; Phase 5 phone acceptance pending |
 | 6. Sales | Atomic checkout, exact amounts, safe retries, payments, and saved receipts | Slices 6A–6D implemented locally; final acceptance and earlier phone/email/callback gates remain |
-| 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Development schema deployed and API access checks passed. Concurrent workflows and device acceptance remain open. |
+| 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Development schema deployed. Hosted concurrent workflows passed. Device acceptance remains open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Branch reports and CSV implemented. Hosted report access checks passed. Device acceptance remains open. |
-| 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Development schema deployed. Cash-sale recovery and device registration implemented. Hosted writes and multi-device acceptance remain open. |
+| 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Development schema deployed. Hosted registration and desktop SQLite recovery checks passed. Physical two-device acceptance remains open. |
 | 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
 
 ## Current interface
@@ -138,7 +138,7 @@ Owners and assigned managers can open **Cash return** from a synced receipt on t
 
 The eighth migration records each return separately from the original sale. Refund amounts use recorded sale prices. The database caps cumulative quantities per receipt line and commits the return, its lines and any stock movements together. The app saves the request on the device before sending it, so a lost reply can be retried after reopening the app with the same account and receipt.
 
-Local validation passed 189 Flutter tests and 34 backend test groups for this slice. The new tests cover returns at the original price, optional restocking, branch permissions, rollback, and recovery after reopening SQLite. Development deployment completed on 12 November 2026. Concurrent hosted acceptance and installed-device checks are pending.
+Local validation passed 189 Flutter tests and 34 backend test groups for this slice. The new tests cover returns at the original price, optional restocking, branch permissions, rollback, and recovery after reopening SQLite. Development deployment and hosted concurrent return checks completed on 12 November 2026. Installed-device checks are pending.
 
 ## Phase 7B cashier shifts
 
@@ -146,7 +146,7 @@ Open **Cash shift** in the branch selling screen, enter the opening float and re
 
 The close shows expected cash, counted cash and variance. Expected cash is opening float plus synced sale totals and cash in, less recorded refunds and cash out. The app requires resolution of linked pending or blocked receipts and saved return requests before closing. A saved shift request survives a lost reply and holds new checkout until it is resolved. Closing freezes the ledger totals and a late new receipt for that drawer goes to review. Older receipts without an assigned shift can still sync.
 
-The cash returns and cash shifts migrations are installed on the development project. Continue the hosted workflows and [device checks](DEVICE_ACCEPTANCE.md#phase-7-installed-device-checks).
+The cash returns and cash shifts migrations are installed on the development project. The [cash-workflow acceptance run](HOSTED_ACCEPTANCE.md#returns-and-cash-shifts) passed 19 hosted checks including concurrent partial returns, repeated movement requests, concurrent closing, late-sale rejection and report reconciliation. Continue the [device checks](DEVICE_ACCEPTANCE.md#phase-7-installed-device-checks).
 
 ## Phase 8 branch cash reports
 
@@ -166,6 +166,12 @@ Broader offline operations and independent two-device acceptance remain open. Fo
 
 After an online branch sync refreshes the catalog, FastPas checks in using the same device ID stored on local cash receipts. Owners can open **Business settings**, choose **Selling devices** on a branch and match its device codes to the selling screens. Each registration belongs to the signed-in account and branch, with a server-recorded last-seen time. Registering again preserves the original registration and pending receipts.
 
-Migration eleven adds the registry and was deployed on 12 November 2026. Hosted checks confirmed Owner access to the branch list and denied anonymous, staff and unrelated Owner access. Registration writes and the [two-device checks](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) remain open. Branch access remains managed through staff assignments.
+Migration eleven adds the registry and was deployed on 12 November 2026. Hosted checks confirmed Owner access to the branch list and denied anonymous, staff and unrelated Owner access. Registration writes passed in the Phase 9C run below. The [physical two-device checks](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) remain open. Branch access remains managed through staff assignments.
 
 Deployment readback matched all eleven affected public function bodies to their repository source and confirmed the execution grants. Twenty-five hosted Auth/API checks passed across three distinct verified accounts. The original seven receipts and 43 stock units matched the pre-deployment counts. [Setup](SETUP.md#1-create-the-backend) records the hosted migration versions and the remaining workflow checks.
+
+## Phase 9C hosted recovery acceptance
+
+The opt-in [hosted SQLite test](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) passed 19 checks on 12 November 2026. It runs the app's `LocalStore` and `SyncService` against the development backend using two independent register directories and three verified accounts. It confirmed registration writes, database reopening, recovery from a lost sale acknowledgment, concurrent reconnects, exact receipt retries, stock convergence, registry restrictions and pending-sale recovery after staff access was restored.
+
+The successful run retained three synced receipts and two registrations in its dedicated fixture. Earlier attempts stopped at a test-manifest type error and retained their separate fixtures. Their manifests and local databases remain available for inspection. The original data outside those fixtures matched its earlier counts. Physical phone timing, airplane mode, app process restart and the two-phone test remain open.

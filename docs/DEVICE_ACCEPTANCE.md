@@ -139,6 +139,8 @@ Phase 6 profile APK built on 5 November 2026: 99,064,514 bytes; SHA-256 `43eaa28
 
 After applying migrations eight and nine to the development project, use a test branch and dedicated accounts. These checks are pending.
 
+The separate [hosted cash-workflow runner](HOSTED_ACCEPTANCE.md#returns-and-cash-shifts) passed 19 checks on 12 November 2026. It verified competing partial returns, repeated requests, drawer ownership, concurrent close and report amounts against the deployed backend. The installed-device checks below remain pending.
+
 | Check | Action | Pass condition |
 |---|---|---|
 | Partial return | As an owner or assigned manager, return a unit from a synced receipt after a price change. Repeat with and without restocking on separate units. | Refunds use the receipt price. Stock increases only for the restocked units. The original receipt remains intact. |
@@ -151,6 +153,16 @@ After applying migrations eight and nine to the development project, use a test 
 After applying migration ten to the development project, run **Cash reports** on a test branch as an owner or assigned manager. Check a period that contains a sale, a refund recorded on a later local day and a closed drawer with a variance. Verify the amounts and dates on screen, then save and open the CSV on the phone. Each daily row should match the screen and the receipt or closing records. Check a different branch and time zone, then switch accounts during a refresh and verify the old report clears. These checks remain pending.
 
 ## Phase 9 installed-device checks
+
+The opt-in desktop acceptance test uses two separate SQLite files and real Supabase Auth/API requests. It creates a dedicated development business, product and cashier invitation. It covers offline checkout, database reopening, a lost upload reply after server commit, concurrent reconnects, registration retries and access removal/restoration.
+
+```powershell
+flutter test --no-pub --dart-define=FASTPAS_HOSTED_ACCEPTANCE=true test/hosted_sync_acceptance_test.dart
+```
+
+Use the three verified accounts and explicit test-write opt-in in the ignored `config/acceptance.local.json`. Each run retains its cloud fixtures and local database directory. Its manifest is saved as `config/phase9-hosted-sync-<business-id>.local.json`, with the latest result also in `config/phase9-hosted-sync.local.json`. Ordinary test runs skip this hosted test.
+
+On 12 November 2026, all 19 hosted checks passed and all three test sessions closed. The successful fixture has three cloud receipts, two registrations and six units remaining from ten opening units. Readback outside the dedicated fixtures matched the original seven receipts and 43 stock units. These results verify the desktop SQLite and hosted service paths. The physical Android checks below remain pending.
 
 Update an existing test install with a pending cash sale, preserving app data. SQLite version 3 opens both earlier layouts. Record an offline sale and interrupt the first upload reply. Reopen the same branch and verify the receipt still has its original ID, amount, and local stock deduction. After reconnecting, use **Sync now** or wait for the next eligible pass. Verify that one cloud receipt exists and stock was deducted once. Reopen the branch while a sync is in progress and repeat on a second device with a separate signed-in account. Confirm that branch and account changes keep each device's queued receipts in their original scope. These checks remain pending.
 
