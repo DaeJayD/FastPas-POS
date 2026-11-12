@@ -15,7 +15,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Development schema deployed. Hosted concurrent workflows passed. Device acceptance remains open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Branch reports and CSV implemented. Hosted report access checks passed. Device acceptance remains open. |
 | 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Development schema deployed. Hosted registration and desktop SQLite recovery checks passed. Physical two-device acceptance remains open. |
-| 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Planned |
+| 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Migration history aligned and application-data restore rehearsed. Android release preparation in progress. Device and production gates remain. |
 
 ## Current interface
 
@@ -175,3 +175,9 @@ Deployment readback matched all eleven affected public function bodies to their 
 The opt-in [hosted SQLite test](DEVICE_ACCEPTANCE.md#phase-9-installed-device-checks) passed 19 checks on 12 November 2026. It runs the app's `LocalStore` and `SyncService` against the development backend using two independent register directories and three verified accounts. It confirmed registration writes, database reopening, recovery from a lost sale acknowledgment, concurrent reconnects, exact receipt retries, stock convergence, registry restrictions and pending-sale recovery after staff access was restored.
 
 The successful run retained three synced receipts and two registrations in its dedicated fixture. Earlier attempts stopped at a test-manifest type error and retained their separate fixtures. Their manifests and local databases remain available for inspection. The original data outside those fixtures matched its earlier counts. Physical phone timing, airplane mode, app process restart and the two-phone test remain open.
+
+## Phase 10 release preparation
+
+On 13 November 2026, the live application's 20 tables and 42 functions matched a clean replay of all eleven repository migrations. Migration history was aligned with the local filenames after retaining the previous records. An independent in-memory PostgreSQL restore of 164 application rows passed 100 checks, including per-table row digests, a receipt retry, stock preservation and tenant isolation. The rehearsal seeds Auth identity references for foreign keys. Full Supabase Auth recovery and managed backup restoration remain separate release work.
+
+The Android build now supports local release signing and a configurable application ID. [Release preparation](RELEASE.md) records the build commands, backup scope and outstanding production/device checks.
