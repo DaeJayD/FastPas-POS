@@ -8,13 +8,17 @@ plugins {
 }
 
 val releaseProperties = Properties()
+// Dart uppercases environment names on Windows before launching Gradle.
 val signingPropertiesFile = rootProject.file(
-    providers.gradleProperty("fastpasSigningProperties").getOrElse("key.properties")
+    providers.gradleProperty("fastpasSigningProperties")
+        .orElse(providers.gradleProperty("FASTPASSIGNINGPROPERTIES"))
+        .getOrElse("key.properties")
 )
 if (signingPropertiesFile.exists()) {
     signingPropertiesFile.inputStream().use { releaseProperties.load(it) }
 }
 val configuredApplicationId = providers.gradleProperty("fastpasApplicationId")
+    .orElse(providers.gradleProperty("FASTPASAPPLICATIONID"))
     .getOrElse("com.example.vasenizzpos")
 
 android {
@@ -57,22 +61,26 @@ android {
     }
 }
 
+val validateFastpasRelease by tasks.registering {
+    doLast {
+        val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        if (required.any { releaseProperties.getProperty(it).isNullOrBlank() }) {
+            throw GradleException(
+                "Configure release signing in android/key.properties. See docs/RELEASE.md."
+            )
+        }
+        if (configuredApplicationId.startsWith("com.example.") ||
+            !configuredApplicationId.matches(Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+"))) {
+            throw GradleException(
+                "Set the final Android ID with ORG_GRADLE_PROJECT_fastpasApplicationId."
+            )
+        }
+    }
+}
+
 tasks.configureEach {
     if (name in listOf("validateSigningRelease", "signReleaseBundle", "packageRelease")) {
-        doFirst {
-            val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
-            if (required.any { releaseProperties.getProperty(it).isNullOrBlank() }) {
-                throw GradleException(
-                    "Configure release signing in android/key.properties. See docs/RELEASE.md."
-                )
-            }
-            if (configuredApplicationId.startsWith("com.example.") ||
-                !configuredApplicationId.matches(Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+"))) {
-                throw GradleException(
-                    "Set the final Android ID with ORG_GRADLE_PROJECT_fastpasApplicationId."
-                )
-            }
-        }
+        dependsOn(validateFastpasRelease)
     }
 }
 

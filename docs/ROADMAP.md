@@ -15,7 +15,7 @@ FastPas is being adapted from a store-specific application into a configurable m
 | 7. Returns and shifts | Partial returns, refund records, cash movements, and shift reconciliation | Development schema deployed. Hosted concurrent workflows passed. Device acceptance remains open. |
 | 8. Reports | Reconciled reports, exports, and optional attendance | Branch reports and CSV implemented. Hosted report access checks passed. Device acceptance remains open. |
 | 9. Offline synchronization | Local database, durable upload queue, device registration, retries, conflicts, and cross-device isolation | Development schema deployed. Hosted registration and desktop SQLite recovery checks passed. Physical two-device acceptance remains open. |
-| 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Migration history aligned and application-data restore rehearsed. Android release preparation in progress. Device and production gates remain. |
+| 10. Release | Android device validation, migration rehearsal, backup restoration, tenant isolation, and two-device outage pilot | Migration history aligned, application-data restore rehearsed and acceptance bundle verified. Device and production gates remain. |
 
 ## Current interface
 
@@ -180,4 +180,4 @@ The successful run retained three synced receipts and two registrations in its d
 
 On 13 November 2026, the live application's 20 tables and 42 functions matched a clean replay of all eleven repository migrations. Migration history was aligned with the local filenames after retaining the previous records. An independent in-memory PostgreSQL restore of 164 application rows passed 100 checks, including per-table row digests, a receipt retry, stock preservation and tenant isolation. The rehearsal seeds Auth identity references for foreign keys. Full Supabase Auth recovery and managed backup restoration remain separate release work.
 
-The Android build now supports local release signing and a configurable application ID. [Release preparation](RELEASE.md) records the build commands, backup scope and outstanding production/device checks.
+The Android build supports local release signing and a configurable application ID. On 14 November 2026, the signed acceptance bundle and normal profile APK both built and passed signature checks. The profile retained its development application ID. All 205 Flutter tests passed, with the hosted write test skipped, and static analysis was clean. Windows environment-variable normalization and Gradle up-to-date validation are covered by the signing regression utility. [Release preparation](RELEASE.md) records the build commands, backup scope and outstanding production/device checks.

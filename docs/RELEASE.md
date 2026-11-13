@@ -28,9 +28,23 @@ Remove-Item Env:ORG_GRADLE_PROJECT_fastpasApplicationId
 
 Replace the example application ID with the owner's chosen store ID. Build validation requires release signing values and rejects the development `com.example.*` ID. For a separate local signing-properties file, set `ORG_GRADLE_PROJECT_fastpasSigningProperties` to its absolute path.
 
+The build accepts the uppercase property names produced by Dart on Windows. To check the same environment boundary that Flutter uses, set both properties and run the signing regression utility.
+
+```powershell
+$env:ORG_GRADLE_PROJECT_fastpasSigningProperties = 'C:/private/fastpas-signing.properties'
+$env:ORG_GRADLE_PROJECT_fastpasApplicationId = 'com.yourcompany.fastpas'
+dart tool/verify_android_signing.dart
+Remove-Item Env:ORG_GRADLE_PROJECT_fastpasSigningProperties
+Remove-Item Env:ORG_GRADLE_PROJECT_fastpasApplicationId
+```
+
+Release packaging depends on a dedicated validation task, so every invocation checks the signing values and application ID even when Gradle considers its signing task up to date.
+
 The current profile install uses the development identifier and signing certificate. A distinct store application ID is a separate installation with its own local data. Complete pending uploads on the development installation before retiring it.
 
-The missing-signing release probe reached the intended validation error on 13 November 2026. The positive temporary-key bundle check and the profile regression build remain pending. An initial probe also encountered a stale generated integration-test registrant; the normal dependency-generation build resolved that compilation failure.
+On 14 November 2026, the acceptance bundle built successfully with `com.fastpas.acceptance` and a temporary test key. Its signature and certificate subject were verified. The retained artifact is `build/acceptance/fastpas-signing-check.aab`. The normal profile APK also rebuilt, passed signature verification and retained `com.example.vasenizzpos`. All 205 Flutter tests passed, with the opt-in hosted write test skipped, and static analysis was clean. Gradle, Android Gradle Plugin and Kotlin deprecation warnings remain.
+
+An earlier probe encountered a stale generated integration-test registrant. Normal dependency generation resolved that compilation failure. The signing regression then identified Windows environment-name normalization and cached signing-task validation, both covered by the updated build checks.
 
 ## Remaining acceptance
 
