@@ -8,6 +8,29 @@ Phase 3 stays open until hosted account isolation and the device checks below pa
 - All 15 local hosted-runner safeguard tests pass. Three verified accounts are still needed for the actual hosted run.
 - A new isolated Android API 36.1 emulator failed during OS boot: SurfaceFlinger aborted with `hasReadColorBufferDma`, including with SwiftShader and Vulkan disabled. APK installation was rejected because the device was still booting. No app startup or native callback result was obtained. Use a physical Android device or a working emulator for the checks below.
 
+## Android emulator acceptance on 14 November 2026
+
+The current profile APK, built from `3a040fb`, was installed on a dedicated `FastPas_Phase10_QA` Android API 36.1 x86_64 emulator. The display was 720 × 1520 at density 320. This run used the development backend, a verified test Owner and a new isolated business/branch/product. Actions were performed through Android's UI and ADB; the app used native SQLite rather than the desktop SQLite test adapter.
+
+| Check | Observed result |
+|---|---|
+| Sign-in and catalog | Owner signed in, opened the test branch and downloaded one ₱25 product with ten units. |
+| Cash shift | Opened a drawer with ₱100. |
+| Real network outage | Disabled emulator Wi-Fi and mobile data. Android reported no active default network. Cash checkout saved one ₱25 receipt, reduced local stock to nine and showed one pending upload. |
+| Process restart offline | Force-stopped and relaunched FastPas without clearing data. Cached sign-in/business access, the original receipt ID, stock of nine, one pending upload and the device code all survived. |
+| Reconnect and repeat sync | Before reconnect, Supabase had zero receipts and ten units. After reconnect and repeated sync, it had exactly one original receipt, nine units, its original shift link and one device registration. The app showed zero pending and one synced receipt. |
+| Return after repricing | Changed only the test product's catalog price to ₱30. The installed app refunded the original ₱25 price and restocked one unit. Cloud readback confirmed ten units and no remaining returnable quantity. |
+| Drawer reconciliation | Recorded ₱10 cash in and ₱5 cash out with reasons. Closed with ₱104.50 counted against ₱105 expected. Both the app and hosted report showed a −₱0.50 variance. |
+| Report and CSV | The native report showed one ₱25 sale, one ₱25 refund, zero net sales and one closed drawer. Saved the CSV on Android and pulled it back; all seven daily rows matched, including the 14 November totals. |
+| Owner settings and forms | Business settings loaded; Selling devices showed the same single device code. Inspected product entry, its numeric keyboard, cash review, receipt, return and shift dialogs. No layout overflow was observed in these inspected states. |
+| Session and crash check | Signed out locally and verified the login screen. The captured Android crash buffer contained no FastPas fatal crash entry. |
+
+Evidence is retained locally in ignored `build/emulator-acceptance/` and `config/emulator-acceptance.local.json`. Cloud fixtures were retained. Existing business data was not used for checkout or inventory changes.
+
+The SDK's AVD creator initially wrote `target=android-0`. After correcting the isolated AVD target to `android-36.1` and using host GLES with Vulkan disabled, Android booted and screen capture worked. Initial boot also showed System UI unresponsive warnings, and the Windows host was under memory pressure. Emulator launch times from this session are unsuitable for judging phone performance. These configuration changes do not establish which individual setting caused the earlier failure. See Android's [emulator troubleshooting guidance](https://developer.android.com/studio/run/emulator-troubleshooting).
+
+The emulator had no CSV viewer; **Open CSV** displayed the supported no-viewer message. External viewer handoff, physical two-phone checks, an upgrade preserving an older installed database, interrupted upload replies on Android, and real email verification/recovery callbacks remain pending. This single-emulator run does not close those gates or establish production readiness.
+
 ## Install and create the first account
 
 1. Build the default app with your ignored development configuration:

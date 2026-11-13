@@ -48,6 +48,8 @@ An earlier probe encountered a stale generated integration-test registrant. Norm
 
 ## Remaining acceptance
 
+The 14 November 2026 [Android emulator run](DEVICE_ACCEPTANCE.md#android-emulator-acceptance-on-14-november-2026) verified native offline cash checkout, process restart, original receipt upload, stock reconciliation, returns, cash shifts, reports and CSV saving on the current profile build. It used a dedicated development fixture. Emulator startup encountered OS-level warnings and host memory pressure, so this run provides functional evidence without a physical-phone performance claim. CSV contents matched; opening through an external viewer still needs a device with a compatible app.
+
 - Complete the physical two-phone outage, process restart and reconnect checks in [device acceptance](DEVICE_ACCEPTANCE.md).
 - Verify real email verification and password recovery links with the app running and closed.
 - Exercise the chosen production backend, Auth settings, tenant isolation and managed backup recovery.
