@@ -1,3 +1,7 @@
+import '../core/theme_preference.dart';
+import 'overview_details.dart';
+import 'overview_panels.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -29,6 +33,9 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
   late WorkspaceBranch _branch = widget.branches.first;
   DateTimeRange? _range;
   BranchCashReport? _report;
+  OverviewDetails? _overview;
+  String? _overviewError;
+  bool _overviewLoading = false;
   StreamSubscription<AuthState>? _auth;
   String? _error;
   int _request = 0;
@@ -93,6 +100,9 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
   void _clearReport() {
     _request++;
     _report = null;
+    _overview = null;
+    _overviewError = null;
+    _overviewLoading = false;
     _error = null;
     _loading = false;
   }
@@ -104,6 +114,9 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
     setState(() {
       _loading = true;
       _report = null;
+      _overview = null;
+      _overviewError = null;
+      _overviewLoading = false;
       _error = null;
     });
     try {
@@ -113,13 +126,44 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
         fromDay: range == null ? null : _date(range.start),
         throughDay: range == null ? null : _date(range.end),
       );
-      if (mounted && _request == request) setState(() => _report = report);
+      if (mounted && _request == request) {
+        setState(() => _report = report);
+        unawaited(_loadOverview(report, request));
+      }
     } catch (error) {
       if (mounted && _request == request) {
         setState(() => _error = _message(error));
       }
     } finally {
       if (mounted && _request == request) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadOverview(BranchCashReport report, int request) async {
+    if (!mounted || _request != request || _accountChanged) return;
+    setState(() {
+      _overviewLoading = true;
+      _overviewError = null;
+    });
+    try {
+      widget.repository.checkAccount();
+      final details = await OverviewDetailsRepository(
+        widget.repository.client,
+        widget.repository.businessId,
+        widget.repository.actor,
+      ).load(report.branchId);
+      if (mounted && _request == request && !_accountChanged)
+        setState(() => _overview = details);
+    } catch (_) {
+      if (mounted && _request == request && !_accountChanged) {
+        setState(
+          () => _overviewError =
+              'Overview details unavailable. Check your connection and access.',
+        );
+      }
+    } finally {
+      if (mounted && _request == request && !_accountChanged)
+        setState(() => _overviewLoading = false);
     }
   }
 
@@ -249,6 +293,14 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
             '${report.fromDay} to ${report.throughDay} · ${report.timezone}',
           ),
           const Text('Synced cash transactions'),
+          const SizedBox(height: 16),
+          OverviewPanels(
+            report: report,
+            details: _overview,
+            detailsLoading: _overviewLoading,
+            error: _overviewError,
+            onRetry: () => _loadOverview(report, _request),
+          ),
           const SizedBox(height: 12),
           Text(
             'Net cash sales ${displayCents(totals.net)}',
@@ -281,7 +333,10 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
   Widget build(BuildContext context) {
     final report = _report;
     return Scaffold(
-      appBar: AppBar(title: const Text('Branch cash report')),
+      appBar: AppBar(
+        title: const Text('Overview'),
+        actions: const [ThemeSwitch()],
+      ),
       body: SafeArea(
         child: _accountChanged
             ? Padding(padding: const EdgeInsets.all(20), child: Text(_error!))

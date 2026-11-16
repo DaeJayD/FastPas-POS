@@ -172,6 +172,8 @@ void main() {
             size.width < 600 ? 'selling-home-phone' : 'selling-home-tablet',
           );
           await tester.ensureVisible(find.byTooltip('Add one').first);
+          await tester.ensureVisible(find.byTooltip('Add one').first);
+          await tester.pumpAndSettle();
           await tester.tap(find.byTooltip('Add one').first);
           await tester.pumpAndSettle();
           expect(find.text('1 item in cart'), findsOneWidget);
@@ -225,15 +227,28 @@ void main() {
       home: screen(sync: (_) async => throw const SocketException('Offline')),
     );
     try {
+      await tester.ensureVisible(find.byTooltip('Add one').first);
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one').first);
       await tester.pumpAndSettle();
-      final search = find.widgetWithText(TextField, 'Search products or SKU');
+      await tester.drag(
+        find.byType(CustomScrollView).first,
+        const Offset(0, 1000),
+      );
+      await tester.pumpAndSettle();
+      final search = find.byType(TextField).first;
+      await tester.ensureVisible(search);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(search);
+      await tester.pumpAndSettle();
       await tester.enterText(search, ' tea-02 ');
       await tester.pumpAndSettle();
       expect(find.text('Green tea'), findsOneWidget);
       expect(find.text('Coffee'), findsNothing);
       expect(find.text('Out of stock'), findsOneWidget);
       expect(find.text('Cash checkout · ₱25.00'), findsOneWidget);
+      await tester.ensureVisible(search);
+      await tester.pumpAndSettle();
       await tester.enterText(search, 'no matching product');
       await tester.pumpAndSettle();
       expect(find.text('No products match your search'), findsOneWidget);
@@ -279,6 +294,8 @@ void main() {
       home: screen(sync: (_) async => throw const SocketException('Offline')),
     );
     try {
+      await tester.ensureVisible(find.byTooltip('Add one').first);
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one').first);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Drinks'));
@@ -306,7 +323,7 @@ void main() {
     (tester) async {
       await open(tester);
       try {
-        await tester.tap(find.text('Add product'));
+        await tester.tap(find.byTooltip('Add product'));
         await tester.pumpAndSettle();
         await capture(tester, 'add-product');
         final fields = find.descendant(
@@ -399,8 +416,10 @@ void main() {
       );
       expect(
         tester
-            .widget<OutlinedButton>(
-              find.widgetWithText(OutlinedButton, 'Add product'),
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == 'Add product',
+              ),
             )
             .onPressed,
         isNull,
@@ -458,7 +477,11 @@ void main() {
     (tester) async {
       await open(tester);
       try {
+        await tester.ensureVisible(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byTooltip('Add one'));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Add one'));
         await tester.pumpAndSettle();
@@ -486,6 +509,8 @@ void main() {
     (tester) async {
       await open(tester);
       try {
+        await tester.ensureVisible(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Add one'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Cash checkout · ₱25.00'));
@@ -531,6 +556,8 @@ void main() {
   ) async {
     await open(tester);
     try {
+      await tester.ensureVisible(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one'));
       await tester.pumpAndSettle();
       final begin = tester
@@ -554,6 +581,8 @@ void main() {
     (tester) async {
       await open(tester);
       try {
+        await tester.ensureVisible(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Add one'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Cash checkout · ₱25.00'));
@@ -579,6 +608,8 @@ void main() {
   ) async {
     await open(tester);
     try {
+      await tester.ensureVisible(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cash checkout · ₱25.00'));
@@ -614,6 +645,8 @@ void main() {
   ) async {
     await open(tester);
     try {
+      await tester.ensureVisible(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cash checkout · ₱25.00'));
@@ -652,7 +685,11 @@ void main() {
     (tester) async {
       await open(tester);
       try {
+        await tester.ensureVisible(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Add one'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('View cart'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Clear cart'));
         await tester.pumpAndSettle();
@@ -715,20 +752,38 @@ void main() {
     },
   );
 
-  testWidgets('Opening history after an account change shows no previous records or endless loader', (tester) async {
-    await tester.runAsync(() => store.checkout({'coffee': 1}, 2500));
-    await tester.runAsync(() => account.client.auth.recoverSession(jsonEncode(account.session('10000000-0000-4000-8000-000000000002'))));
-    await open(tester, home: ReceiptHistoryScreen(client: account.client, store: store, branchName: 'Main branch', onSync: () async {}));
-    try {
-      expect(find.text('Account changed. Return to your businesses.'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.textContaining('₱25.00'), findsNothing);
-      expect((await tester.runAsync(store.receipts))!.length, 1);
-    } finally {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await settleStore(tester);
-    }
-  });
+  testWidgets(
+    'Opening history after an account change shows no previous records or endless loader',
+    (tester) async {
+      await tester.runAsync(() => store.checkout({'coffee': 1}, 2500));
+      await tester.runAsync(
+        () => account.client.auth.recoverSession(
+          jsonEncode(account.session('10000000-0000-4000-8000-000000000002')),
+        ),
+      );
+      await open(
+        tester,
+        home: ReceiptHistoryScreen(
+          client: account.client,
+          store: store,
+          branchName: 'Main branch',
+          onSync: () async {},
+        ),
+      );
+      try {
+        expect(
+          find.text('Account changed. Return to your businesses.'),
+          findsOneWidget,
+        );
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.textContaining('₱25.00'), findsNothing);
+        expect((await tester.runAsync(store.receipts))!.length, 1);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await settleStore(tester);
+      }
+    },
+  );
 
   testWidgets('Receipt history loads older receipts on demand', (tester) async {
     final ids = await tester.runAsync(() async {
@@ -822,6 +877,8 @@ void main() {
   ) async {
     await open(tester);
     try {
+      await tester.ensureVisible(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one'));
       await tester.pumpAndSettle();
       await capture(tester, 'selling');
@@ -851,7 +908,8 @@ void main() {
       expect(find.text('Sale saved on this device'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
-          (widget) => widget is SelectableText &&
+          (widget) =>
+              widget is SelectableText &&
               (widget.data?.contains('Change ₱5.00') ?? false),
         ),
         findsOneWidget,
@@ -870,7 +928,7 @@ void main() {
     (tester) async {
       await open(tester);
       try {
-        await tester.tap(find.text('Add product'));
+        await tester.tap(find.byTooltip('Add product'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byKey(const ValueKey('Name')), 'Tea');
         await tester.enterText(find.byKey(const ValueKey('SKU')), 'TEA');

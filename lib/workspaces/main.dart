@@ -3,6 +3,7 @@ import 'package:app_links/app_links.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/fastpas_theme.dart';
+import '../core/theme_preference.dart';
 import 'workspace_screen.dart';
 import 'workspace_account.dart';
 
@@ -51,10 +52,14 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    title: 'FastPas POS',
-    theme: Volt.theme,
-    home: WorkspaceScreen(client: widget.client, account: _account),
+  Widget build(BuildContext context) => PosThemeHost(
+    builder: (mode) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'FastPas POS',
+      theme: Volt.theme,
+      darkTheme: Volt.darkTheme,
+      themeMode: mode,
+      home: WorkspaceScreen(client: widget.client, account: _account),
+    ),
   );
 }

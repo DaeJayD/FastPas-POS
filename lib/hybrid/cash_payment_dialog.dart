@@ -68,7 +68,7 @@ class _CashPaymentDialogState extends State<CashPaymentDialog> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_saving,
     child: AlertDialog(
-      title: const Text('Cash payment'),
+      title: Text('Cash payment'),
       scrollable: true,
       content: SizedBox(
         width: 400,
@@ -78,55 +78,49 @@ class _CashPaymentDialogState extends State<CashPaymentDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Review this sale before confirming.',
-                style: TextStyle(color: Volt.muted),
-              ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               for (final line in widget.quote.lines)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.only(bottom: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         '${line.quantity} × ${line.name}',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         '${line.sku} · ${displayCents(line.unitCents)} each · ${displayCents(line.quantity * line.unitCents)}',
-                        style: const TextStyle(fontSize: 12, color: Volt.muted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.pos.muted,
+                        ),
                       ),
                     ],
                   ),
                 ),
-              const Divider(),
-              const SizedBox(height: 8),
+              Divider(),
+              SizedBox(height: 8),
               Text(
                 'Total due ${displayCents(widget.quote.totalCents)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               TextFormField(
-                key: const ValueKey('Cash received'),
+                key: ValueKey('Cash received'),
                 controller: _cash,
                 enabled: !_saving,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
                 textInputAction: TextInputAction.done,
                 validator: _validate,
                 onFieldSubmitted: (_) => _confirm(),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Cash received',
                   errorMaxLines: 3,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               ValueListenableBuilder<TextEditingValue>(
                 valueListenable: _cash,
                 builder: (context, value, _) {
@@ -144,14 +138,14 @@ class _CashPaymentDialogState extends State<CashPaymentDialog> {
                     liveRegion: true,
                     child: Text(
                       text,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   );
                 },
               ),
               if (_error != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 16),
+                  padding: EdgeInsets.only(top: 16),
                   child: Text(
                     _error!,
                     style: TextStyle(
@@ -166,7 +160,7 @@ class _CashPaymentDialogState extends State<CashPaymentDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel'),
         ),
         FilledButton(
           onPressed: _saving ? null : _confirm,

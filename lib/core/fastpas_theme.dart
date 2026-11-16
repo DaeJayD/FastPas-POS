@@ -1,143 +1,241 @@
 import 'package:flutter/material.dart';
 
-abstract final class Volt {
-  static const ink = Color(0xFF202528);
-  static const lime = Color(0xFFCEF54A);
-  static const background = Color(0xFFEDF0F2);
-  static const line = Color(0xFFD6DEE2);
-  static const muted = Color(0xFF5D6870);
-  static const soft = Color(0xFFE5EBEE);
-  static const surface = Color(0xFFF9FAFB);
-
-  static final ThemeData theme = _buildTheme();
-
-  static ThemeData _buildTheme() {
-    final scheme = ColorScheme.fromSeed(seedColor: ink).copyWith(
-      primary: ink,
-      onPrimary: Colors.white,
-      secondary: lime,
-      onSecondary: ink,
-      surface: surface,
-      onSurface: ink,
-      outline: muted,
-      outlineVariant: line,
+/// Semantic roles shared by the release screens and their dialogs.
+@immutable
+class PosColors extends ThemeExtension<PosColors> {
+  const PosColors({
+    required this.background,
+    required this.surface,
+    required this.subtle,
+    required this.border,
+    required this.text,
+    required this.muted,
+    required this.accent,
+    required this.accentText,
+    required this.accentSoft,
+    required this.warning,
+    required this.warningSurface,
+    required this.success,
+    required this.error,
+  });
+  final Color background,
+      surface,
+      subtle,
+      border,
+      text,
+      muted,
+      accent,
+      accentText,
+      accentSoft,
+      warning,
+      warningSurface,
+      success,
+      error;
+  static const porcelain = PosColors(
+    background: Color(0xFFF5F6F2),
+    surface: Colors.white,
+    subtle: Color(0xFFF0F2EB),
+    border: Color(0xFFDCE1D7),
+    text: Color(0xFF20291E),
+    muted: Color(0xFF626E5F),
+    accent: Color(0xFFCEF54A),
+    accentText: Color(0xFF1C260E),
+    accentSoft: Color(0xFFEDF4DC),
+    warning: Color(0xFF934618),
+    warningSurface: Color(0xFFFFF0DF),
+    success: Color(0xFF466634),
+    error: Color(0xFF9B3726),
+  );
+  static const forest = PosColors(
+    background: Color(0xFF101312),
+    surface: Color(0xFF191E1B),
+    subtle: Color(0xFF242D25),
+    border: Color(0xFF303932),
+    text: Color(0xFFF0F3ED),
+    muted: Color(0xFFA2AEA4),
+    accent: Color(0xFFCEF54A),
+    accentText: Color(0xFF1C260E),
+    accentSoft: Color(0xFF28331F),
+    warning: Color(0xFFFFC49F),
+    warningSurface: Color(0xFF493326),
+    success: Color(0xFFB5D79C),
+    error: Color(0xFFFFB6A3),
+  );
+  @override
+  PosColors copyWith() => this;
+  @override
+  PosColors lerp(covariant PosColors? other, double t) {
+    if (other == null) return this;
+    Color mix(Color a, Color b) => Color.lerp(a, b, t)!;
+    return PosColors(
+      background: mix(background, other.background),
+      surface: mix(surface, other.surface),
+      subtle: mix(subtle, other.subtle),
+      border: mix(border, other.border),
+      text: mix(text, other.text),
+      muted: mix(muted, other.muted),
+      accent: mix(accent, other.accent),
+      accentText: mix(accentText, other.accentText),
+      accentSoft: mix(accentSoft, other.accentSoft),
+      warning: mix(warning, other.warning),
+      warningSurface: mix(warningSurface, other.warningSurface),
+      success: mix(success, other.success),
+      error: mix(error, other.error),
     );
+  }
+}
+
+extension PosThemeContext on BuildContext {
+  PosColors get pos =>
+      Theme.of(this).extension<PosColors>() ??
+      (Theme.of(this).brightness == Brightness.dark
+          ? PosColors.forest
+          : PosColors.porcelain);
+}
+
+abstract final class Volt {
+  // Compatibility aliases for the separate legacy preview. Release widgets use context.pos.
+  static const ink = Color(0xFF20291E), lime = Color(0xFFCEF54A);
+  static const background = Color(0xFFF5F6F2),
+      line = Color(0xFFDCE1D7),
+      muted = Color(0xFF626E5F),
+      soft = Color(0xFFF0F2EB),
+      surface = Colors.white;
+  static final ThemeData theme = _build(PosColors.porcelain, Brightness.light);
+  static final ThemeData darkTheme = _build(PosColors.forest, Brightness.dark);
+  static ThemeData _build(PosColors p, Brightness brightness) {
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: p.accent,
+          brightness: brightness,
+        ).copyWith(
+          primary: brightness == Brightness.dark
+              ? p.accent
+              : const Color(0xFF456315),
+          onPrimary: brightness == Brightness.dark
+              ? p.accentText
+              : Colors.white,
+          secondary: p.accent,
+          onSecondary: p.accentText,
+          surface: p.surface,
+          onSurface: p.text,
+          onSurfaceVariant: p.muted,
+          outline: p.muted,
+          outlineVariant: p.border,
+          error: p.error,
+          surfaceContainerHighest: p.subtle,
+        );
     final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: line),
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: p.border),
     );
     return ThemeData(
-      fontFamily: 'Roboto',
       useMaterial3: true,
+      brightness: brightness,
+      fontFamily: 'Roboto',
       colorScheme: scheme,
-      scaffoldBackgroundColor: background,
-      visualDensity: VisualDensity.standard,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: background,
-        foregroundColor: ink,
+      extensions: [p],
+      scaffoldBackgroundColor: p.background,
+      disabledColor: p.muted.withValues(alpha: .55),
+      appBarTheme: AppBarTheme(
+        backgroundColor: p.background,
+        foregroundColor: p.text,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
         elevation: 0,
         titleTextStyle: TextStyle(
           fontFamily: 'Roboto',
-          color: ink,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+          color: p.text,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
         ),
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: p.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: line),
+          side: BorderSide(color: p.border),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: surface,
+        backgroundColor: p.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 2,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: line),
+          side: BorderSide(color: p.border),
         ),
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontFamily: 'Roboto',
-          color: ink,
+          color: p.text,
           fontSize: 22,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: p.surface,
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: ink, width: 1.5),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 18,
+          vertical: 16,
         ),
-        hintStyle: const TextStyle(color: muted),
+        hintStyle: TextStyle(color: p.muted),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: lime,
-          foregroundColor: ink,
+          backgroundColor: p.accent,
+          foregroundColor: p.accentText,
+          disabledBackgroundColor: p.subtle,
+          disabledForegroundColor: p.muted,
           minimumSize: const Size(48, 52),
-          textStyle: const TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: ink,
+          foregroundColor: p.text,
           minimumSize: const Size(48, 48),
-          side: const BorderSide(color: line),
+          side: BorderSide(color: p.border),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: ink,
-          foregroundColor: Colors.white,
+          backgroundColor: p.accent,
+          foregroundColor: p.accentText,
           minimumSize: const Size(48, 48),
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
         ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: p.surface,
+        selectedColor: p.accentSoft,
+        labelStyle: TextStyle(color: p.text),
+        side: BorderSide(color: p.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: lime.withValues(alpha: .24),
-        labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
-            color: states.contains(WidgetState.selected) ? ink : muted,
-            fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w700
-                : FontWeight.w500,
-            fontSize: 12,
-          ),
-        ),
+        backgroundColor: p.surface,
+        indicatorColor: p.accentSoft,
       ),
-      dividerTheme: const DividerThemeData(color: line, thickness: 1),
+      dividerTheme: DividerThemeData(color: p.border, thickness: 1),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: ink,
+        backgroundColor: p.text,
+        contentTextStyle: TextStyle(color: p.background),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -157,7 +255,9 @@ class FastPasBrand extends StatelessWidget {
         SizedBox(
           width: size * 1.15,
           height: size,
-          child: CustomPaint(painter: _SpeedMark()),
+          child: CustomPaint(
+            painter: _SpeedMark(Theme.of(context).colorScheme.onSurface),
+          ),
         ),
         const SizedBox(width: 10),
         Text(
@@ -166,7 +266,7 @@ class FastPasBrand extends StatelessWidget {
             fontSize: size,
             fontWeight: FontWeight.w800,
             letterSpacing: -1.2,
-            color: Volt.ink,
+            color: context.pos.text,
           ),
         ),
         const SizedBox(width: 6),
@@ -175,7 +275,7 @@ class FastPasBrand extends StatelessWidget {
           style: TextStyle(
             fontSize: size * .47,
             fontWeight: FontWeight.w700,
-            color: Volt.muted,
+            color: context.pos.muted,
           ),
         ),
       ],
@@ -186,10 +286,13 @@ class FastPasBrand extends StatelessWidget {
 class FastPasMark extends StatelessWidget {
   const FastPasMark({super.key});
   @override
-  Widget build(BuildContext context) => CustomPaint(painter: _SpeedMark());
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _SpeedMark(Theme.of(context).colorScheme.onSurface));
 }
 
 class _SpeedMark extends CustomPainter {
+  _SpeedMark(this.foreground);
+  final Color foreground;
   @override
   void paint(Canvas canvas, Size size) {
     final small = Path()
@@ -205,9 +308,10 @@ class _SpeedMark extends CustomPainter {
       ..lineTo(size.width * .60, size.height)
       ..close();
     canvas.drawPath(small, Paint()..color = Volt.lime);
-    canvas.drawPath(large, Paint()..color = Volt.ink);
+    canvas.drawPath(large, Paint()..color = foreground);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SpeedMark oldDelegate) =>
+      oldDelegate.foreground != foreground;
 }

@@ -34,7 +34,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('Sign in'), findsWidgets);
       await tester.ensureVisible(find.text('Create an account'));
       await tester.tap(find.text('Create an account'));
       await tester.pumpAndSettle();

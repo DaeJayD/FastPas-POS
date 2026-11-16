@@ -416,7 +416,7 @@ void main() {
       await tester.tap(find.text('Load more products'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('51 products loaded.'),
+        find.text('51 of 51 loaded products'),
         250,
         scrollable: find
             .descendant(

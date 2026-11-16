@@ -1,3 +1,6 @@
+import '../core/theme_preference.dart';
+import 'inventory_card.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -38,6 +41,19 @@ class _CatalogScreenState extends State<CatalogScreen>
   List<CatalogItem> _items = [];
   List<Map<String, dynamic>> _movements = [];
   String _kind = 'category', _search = '';
+  String _stockFilter = 'All stock';
+  List<CatalogItem> get _visibleItems => _items
+      .where(
+        (item) => switch (_stockFilter) {
+          'Stock attention' =>
+            item.quantity <= 0 ||
+                item.threshold > 0 && item.quantity <= item.threshold,
+          'Out of stock' => item.quantity <= 0,
+          'In stock' => item.quantity > 0,
+          _ => true,
+        },
+      )
+      .toList();
   String? _historyProduct, _error;
   bool _ready = false;
   bool _busy = false,
@@ -494,6 +510,29 @@ class _CatalogScreenState extends State<CatalogScreen>
                   icon: const Icon(Icons.add),
                   label: const Text('Add product'),
                 ),
+                SizedBox(
+                  width: 220,
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _stockFilter,
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (final value in [
+                        'All stock',
+                        'Stock attention',
+                        'Out of stock',
+                        'In stock',
+                      ])
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(value, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _stockFilter = value);
+                    },
+                  ),
+                ),
                 FilterChip(
                   label: const Text('Include archived'),
                   selected: _archived,
@@ -512,9 +551,9 @@ class _CatalogScreenState extends State<CatalogScreen>
       Expanded(
         child: ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _items.length + 1,
+          itemCount: _visibleItems.length + 1,
           itemBuilder: (context, index) {
-            if (index == _items.length) {
+            if (index == _visibleItems.length) {
               return Padding(
                 padding: const EdgeInsets.all(16),
                 child: _moreItems
@@ -523,13 +562,13 @@ class _CatalogScreenState extends State<CatalogScreen>
                         child: const Text('Load more products'),
                       )
                     : Text(
-                        _items.isEmpty && !_busy
+                        _visibleItems.isEmpty && !_busy
                             ? 'No matching products.'
-                            : '${_items.length} products loaded.',
+                            : '${_visibleItems.length} of ${_items.length} loaded products',
                       ),
               );
             }
-            final item = _items[index];
+            final item = _visibleItems[index];
             final names = _labels
                 .where(
                   (label) => [
@@ -540,83 +579,43 @@ class _CatalogScreenState extends State<CatalogScreen>
                 )
                 .map((label) => label.name)
                 .join(' · ');
-            return Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.name,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text('${item.sku} · ${displayCents(item.price)}'),
-                          if (names.isNotEmpty) Text(names),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${item.quantity} in stock${item.active ? '' : ' · Archived'}',
-                          ),
-                          if (item.quantity < 0)
-                            const Text(
-                              'Stock needs review',
-                              style: TextStyle(color: Colors.red),
-                            )
-                          else if (item.threshold > 0 &&
-                              item.quantity <= item.threshold)
-                            Text(
-                              'Low stock · alert at ${item.threshold}',
-                              style: const TextStyle(color: Colors.deepOrange),
-                            ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuButton<String>(
-                      tooltip: 'Product actions',
-                      enabled: !_busy,
-                      onSelected: (action) {
-                        if (action == 'edit') {
-                          unawaited(_item(item));
-                        } else if (action == 'history') {
-                          _historyProduct = item.id;
-                          _tabs.index = 2;
-                          unawaited(_reload());
-                        } else {
-                          unawaited(_stock(item, action));
-                        }
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Text('Edit product'),
-                        ),
-                        PopupMenuItem(
-                          value: 'receive',
-                          child: Text('Receive stock'),
-                        ),
-                        PopupMenuItem(
-                          value: 'count',
-                          child: Text('Set physical count'),
-                        ),
-                        PopupMenuItem(
-                          value: 'transfer',
-                          child: Text('Transfer stock'),
-                        ),
-                        PopupMenuItem(
-                          value: 'threshold',
-                          child: Text('Low-stock alert'),
-                        ),
-                        PopupMenuItem(
-                          value: 'history',
-                          child: Text('Movement history'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            return InventoryCard(
+              item: item,
+              category: names.isEmpty ? 'Uncategorized' : names,
+              actions: PopupMenuButton<String>(
+                tooltip: 'Product actions',
+                enabled: !_busy,
+                onSelected: (action) {
+                  if (action == 'edit') {
+                    unawaited(_item(item));
+                  } else if (action == 'history') {
+                    _historyProduct = item.id;
+                    _tabs.index = 2;
+                    unawaited(_reload());
+                  } else {
+                    unawaited(_stock(item, action));
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit product')),
+                  PopupMenuItem(value: 'receive', child: Text('Receive stock')),
+                  PopupMenuItem(
+                    value: 'count',
+                    child: Text('Set physical count'),
+                  ),
+                  PopupMenuItem(
+                    value: 'transfer',
+                    child: Text('Transfer stock'),
+                  ),
+                  PopupMenuItem(
+                    value: 'threshold',
+                    child: Text('Low-stock alert'),
+                  ),
+                  PopupMenuItem(
+                    value: 'history',
+                    child: Text('Movement history'),
+                  ),
+                ],
               ),
             );
           },
@@ -749,8 +748,9 @@ class _CatalogScreenState extends State<CatalogScreen>
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Catalog & inventory'),
+      title: const Text('Inventory'),
       actions: [
+        const ThemeSwitch(),
         IconButton(
           tooltip: 'Refresh inventory',
           onPressed: _busy ? null : _reload,

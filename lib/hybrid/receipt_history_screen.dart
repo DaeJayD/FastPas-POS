@@ -34,7 +34,7 @@ class ReceiptHistoryScreen extends StatefulWidget {
 
 class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
   List<SavedReceipt> _entries = [];
-  ReceiptCounts _counts = const ReceiptCounts();
+  ReceiptCounts _counts = ReceiptCounts();
   String? _status, _error;
   int? _next;
   int _request = 0;
@@ -55,7 +55,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
       if (dialog != null && dialog.mounted) Navigator.pop(dialog);
       setState(() {
         _entries = [];
-        _counts = const ReceiptCounts();
+        _counts = ReceiptCounts();
         _next = null;
         _loading = false;
         _error = 'Account changed. Return to your businesses.';
@@ -136,7 +136,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
               children: [
                 if (row['error'] != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.only(bottom: 12),
                     child: Text(
                       row['error'] as String,
                       style: TextStyle(
@@ -145,7 +145,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                     ),
                   ),
                 if (row['status'] == 'pending' && row['retry_after_ms'] != null)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(bottom: 12),
                     child: Text(
                       'Sync now can retry this receipt before the automatic wait ends.',
@@ -164,11 +164,11 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
               if (widget.canRecordReturns && row['status'] == 'synced')
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Cash return'),
+                  child: Text('Cash return'),
                 ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+                child: Text('Close'),
               ),
             ],
           );
@@ -211,7 +211,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
   }
 
   Widget _filter(String label, String? status) => Padding(
-    padding: const EdgeInsets.only(right: 8),
+    padding: EdgeInsets.only(right: 8),
     child: ChoiceChip(
       label: Text(label),
       selected: _status == status,
@@ -227,23 +227,23 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Saved receipts'),
+      title: Text('Saved receipts'),
       actions: [
         IconButton(
           onPressed: _loading || !_sameAccount ? null : () => _load(),
           tooltip: 'Refresh receipts',
-          icon: const Icon(Icons.refresh),
+          icon: Icon(Icons.refresh),
         ),
         IconButton(
           onPressed: _syncing || !_sameAccount ? null : _sync,
           tooltip: 'Sync now',
-          icon: const Icon(Icons.sync),
+          icon: Icon(Icons.sync),
         ),
       ],
     ),
     body: SafeArea(
       child: ListView.builder(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20),
         itemCount: _entries.length + 2,
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -253,14 +253,14 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                 if (_sameAccount) ...[
                   Text(
                     'Receipts on this device · ${widget.branchName}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(
                     '${_counts.pending} pending · ${_counts.blocked} need review · ${_counts.synced} synced',
-                    style: const TextStyle(color: Volt.muted),
+                    style: TextStyle(color: context.pos.muted),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -272,9 +272,9 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                 ],
-                if (_syncing) const LinearProgressIndicator(),
+                if (_syncing) LinearProgressIndicator(),
                 if (_error != null) ...[
                   Text(
                     _error!,
@@ -285,14 +285,14 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                   if (_sameAccount)
                     TextButton(
                       onPressed: () => _load(reset: _entries.isEmpty),
-                      child: const Text('Retry receipts'),
+                      child: Text('Retry receipts'),
                     ),
                 ],
                 if (!_loading &&
                     _entries.isEmpty &&
                     _sameAccount &&
                     _error == null)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Text(
                       'No receipts in this view yet.',
@@ -304,20 +304,20 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
           }
           if (index == _entries.length + 1) {
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: 16),
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(child: CircularProgressIndicator())
                   : _next != null
                   ? OutlinedButton(
                       onPressed: () => _load(reset: false),
-                      child: const Text('Load more receipts'),
+                      child: Text('Load more receipts'),
                     )
-                  : const SizedBox.shrink(),
+                  : SizedBox.shrink(),
             );
           }
           final receipt = _entries[index - 1];
           return Card(
-            margin: const EdgeInsets.only(bottom: 10),
+            margin: EdgeInsets.only(bottom: 10),
             child: ListTile(
               leading: Icon(
                 receipt.status == 'blocked'
@@ -327,7 +327,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                     : Icons.schedule,
                 color: receipt.status == 'blocked'
                     ? Theme.of(context).colorScheme.error
-                    : Volt.muted,
+                    : context.pos.muted,
               ),
               title: Text(
                 '${displayCents(receipt.totalCents)} · ${receiptStatusLabel(receipt.status)}',
@@ -337,7 +337,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: Icon(Icons.chevron_right),
               onTap: () => _open(receipt),
             ),
           );

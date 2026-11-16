@@ -42,48 +42,52 @@ class SellingHome extends StatelessWidget {
   final int pending, blocked;
   final VoidCallback? onAddProduct, onRetry;
 
-  Widget _category(String label, String? value) => Padding(
-    padding: const EdgeInsets.only(right: 8),
-    child: ChoiceChip(
-      label: Text(label),
-      selected: category == value,
-      onSelected: locked ? null : (_) => onCategory(value),
-      selectedColor: Volt.ink,
-      backgroundColor: Volt.surface,
-      showCheckmark: false,
-      labelStyle: TextStyle(
-        color: category == value ? Volt.lime : Volt.ink,
-        fontWeight: FontWeight.w600,
-      ),
-      side: BorderSide(color: category == value ? Volt.ink : Volt.line),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-  );
+  Widget _category(BuildContext context, String label, String? value) =>
+      Padding(
+        padding: EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: category == value,
+          onSelected: locked ? null : (_) => onCategory(value),
+          selectedColor: context.pos.accentSoft,
+          backgroundColor: context.pos.surface,
+          showCheckmark: false,
+          labelStyle: TextStyle(
+            color: category == value
+                ? Theme.of(context).colorScheme.primary
+                : context.pos.muted,
+            fontWeight: FontWeight.w600,
+          ),
+          side: BorderSide(
+            color: category == value ? context.pos.text : context.pos.border,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     final connected = status.startsWith('Connected');
     final motion = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 160);
+        : Duration(milliseconds: 160);
     return CustomScrollView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+          padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
           sliver: SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Volt.soft,
+                    color: context.pos.subtle,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Volt.line),
+                    border: Border.all(color: context.pos.border),
                   ),
                   child: Row(
                     children: [
@@ -94,42 +98,38 @@ class SellingHome extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: syncing
-                              ? Colors.amber.shade700
+                              ? context.pos.warning
                               : connected
-                              ? Colors.teal.shade700
-                              : Volt.muted,
+                              ? context.pos.success
+                              : context.pos.muted,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               status,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            SizedBox(height: 2),
                             Text(
                               '$pending pending · $blocked need review',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Volt.muted,
+                                color: context.pos.muted,
                               ),
                             ),
                             if (deviceId case final id?)
                               Text(
                                 'Device ${id.split('-').first.toUpperCase()}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: Volt.muted,
+                                  color: context.pos.muted,
                                 ),
                               ),
                           ],
@@ -139,72 +139,66 @@ class SellingHome extends StatelessWidget {
                   ),
                 ),
                 if (busy || syncing)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: LinearProgressIndicator(minHeight: 2),
                   ),
                 if (!allowed && !busy)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 10),
                     child: Text(
                       'Connect to verify selling access. Offline access lasts up to 24 hours after verification.',
-                      style: TextStyle(fontSize: 12, color: Volt.muted),
+                      style: TextStyle(fontSize: 12, color: context.pos.muted),
                     ),
                   ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        'Products',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    if (onAddProduct != null)
-                      OutlinedButton.icon(
-                        onPressed: locked ? null : onAddProduct,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Add product'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: search,
-                  onChanged: (_) => onSearch(),
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search products or SKU',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: search.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear search',
-                            onPressed: () {
-                              search.clear();
-                              onSearch();
-                            },
-                            icon: const Icon(Icons.close),
+                      child: TextField(
+                        controller: search,
+                        onChanged: (_) => onSearch(),
+                        textInputAction: TextInputAction.search,
+                        decoration: InputDecoration(
+                          hintText: 'Search products or SKU',
+                          prefixIcon: Icon(Icons.search),
+                          suffixIcon: search.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Clear search',
+                                  onPressed: () {
+                                    search.clear();
+                                    onSearch();
+                                  },
+                                  icon: Icon(Icons.close),
+                                ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
                           ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (onAddProduct != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Add product',
+                        onPressed: locked ? null : onAddProduct,
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  ],
                 ),
                 if (categories.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 10),
+                    padding: EdgeInsets.only(top: 10),
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _category('All products', null),
+                          _category(context, 'All products', null),
                           for (final entry in categories.entries)
-                            _category(entry.value, entry.key),
+                            _category(context, entry.value, entry.key),
                         ],
                       ),
                     ),
@@ -216,44 +210,44 @@ class SellingHome extends StatelessWidget {
         if (products.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 24),
               child: Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.inventory_2_outlined,
                     size: 36,
-                    color: Volt.muted,
+                    color: context.pos.muted,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Text(
                     busy
                         ? 'Opening products…'
                         : catalogEmpty
                         ? 'Your catalog is empty'
                         : 'No products match your search',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   Text(
                     catalogEmpty
                         ? 'Connect to download products, or add your first product.'
                         : 'Try a different name, SKU or category. Your cart is kept.',
-                    style: const TextStyle(color: Volt.muted),
+                    style: TextStyle(color: context.pos.muted),
                     textAlign: TextAlign.center,
                   ),
                   if (onRetry != null)
                     TextButton.icon(
                       onPressed: onRetry,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry opening store'),
+                      icon: Icon(Icons.refresh),
+                      label: Text('Retry opening store'),
                     ),
                 ],
               ),
             ),
           ),
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverLayoutBuilder(
             builder: (context, constraints) {
               Widget tile(BuildContext context, int index) {
@@ -277,14 +271,14 @@ class SellingHome extends StatelessWidget {
 
               final scale = MediaQuery.textScalerOf(context).scale(1);
               final columns =
-                  (constraints.crossAxisExtent / (320 * scale.clamp(1, 1.5)))
+                  (constraints.crossAxisExtent / (250 * scale.clamp(1, 1.5)))
                       .floor()
                       .clamp(1, 4);
               if (columns == 1) {
                 return SliverList.builder(
                   itemCount: products.length,
                   itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.only(bottom: 12),
                     child: tile(context, index),
                   ),
                 );
@@ -294,7 +288,7 @@ class SellingHome extends StatelessWidget {
                   crossAxisCount: columns,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  mainAxisExtent: 230 + (scale - 1).clamp(0, 2) * 130,
+                  mainAxisExtent: 270 + (scale - 1).clamp(0, 2) * 180,
                 ),
                 itemCount: products.length,
                 itemBuilder: tile,
@@ -302,7 +296,7 @@ class SellingHome extends StatelessWidget {
             },
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+        SliverToBoxAdapter(child: SizedBox(height: 20)),
       ],
     );
   }

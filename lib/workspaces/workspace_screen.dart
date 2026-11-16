@@ -1,3 +1,5 @@
+import '../core/theme_preference.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -383,6 +385,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       appBar: AppBar(
         title: const Text('FastPas POS'),
         actions: [
+          const ThemeSwitch(),
           if (signedIn)
             TextButton(
               onPressed: _busy
@@ -458,7 +461,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   ),
                 ] else if (!signedIn) ...[
                   Text(
-                    _register ? 'Create your account' : 'Welcome back',
+                    _register ? 'Create your account' : 'Sign in',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 20),
@@ -539,9 +542,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     'Your businesses',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
-                  const Text(
-                    'Create your business or join one using an invitation from its owner.',
-                  ),
+
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 8,

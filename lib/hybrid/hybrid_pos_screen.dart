@@ -1,3 +1,6 @@
+import '../core/theme_preference.dart';
+import 'checkout_cart.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -478,12 +481,14 @@ class _HybridPosScreenState extends State<HybridPosScreen>
     }
   }
 
+  bool _cartExpanded = false;
+
   Widget _cartBar() {
     final count = _cart.values.fold(0, (sum, quantity) => sum + quantity);
     return Container(
-      decoration: const BoxDecoration(
-        color: Volt.surface,
-        border: Border(top: BorderSide(color: Volt.line)),
+      decoration: BoxDecoration(
+        color: context.pos.surface,
+        border: Border(top: BorderSide(color: context.pos.border)),
       ),
       child: SafeArea(
         top: false,
@@ -505,13 +510,11 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  if (_cart.isNotEmpty)
-                    TextButton(
-                      onPressed: _busy || _paying
-                          ? null
-                          : () => setState(_cart.clear),
-                      child: const Text('Clear cart'),
-                    ),
+                  TextButton.icon(
+                    onPressed: () => setState(() => _cartExpanded = true),
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                    label: const Text('View cart'),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -561,71 +564,138 @@ class _HybridPosScreenState extends State<HybridPosScreen>
       canPop: !_busy,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            '${widget.business.name} · ${widget.branch.name}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          title: const Text('Checkout'),
+          actions: const [ThemeSwitch()],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    '${widget.business.name} · ${widget.branch.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: context.pos.muted, fontSize: 12),
+                  ),
+                ),
+                if ([
+                  'owner',
+                  'manager',
+                  'cashier',
+                ].contains(widget.business.role))
+                  IconButton(
+                    onPressed:
+                        _store == null ||
+                            _busy ||
+                            _paying ||
+                            widget.client.auth.currentUser?.id != _userId
+                        ? null
+                        : _showCashShift,
+                    tooltip: 'Cash shift',
+                    icon: const Icon(Icons.point_of_sale_outlined),
+                  ),
+                IconButton(
+                  onPressed:
+                      _store == null ||
+                          _busy ||
+                          _paying ||
+                          widget.client.auth.currentUser?.id != _userId
+                      ? null
+                      : _history,
+                  tooltip: 'Saved receipts',
+                  icon: const Icon(Icons.receipt_long_outlined),
+                ),
+                IconButton(
+                  onPressed: _busy || _syncing
+                      ? null
+                      : () => _startSync(force: true),
+                  tooltip: 'Sync now',
+                  icon: const Icon(Icons.sync),
+                ),
+              ],
+            ),
           ),
-          actions: [
-            if (['owner', 'manager', 'cashier'].contains(widget.business.role))
-              IconButton(
-                onPressed:
-                    _store == null ||
-                        _busy ||
-                        _paying ||
-                        widget.client.auth.currentUser?.id != _userId
-                    ? null
-                    : _showCashShift,
-                tooltip: 'Cash shift',
-                icon: const Icon(Icons.point_of_sale_outlined),
-              ),
-            IconButton(
-              onPressed:
-                  _store == null ||
-                      _busy ||
-                      _paying ||
-                      widget.client.auth.currentUser?.id != _userId
-                  ? null
-                  : _history,
-              tooltip: 'Saved receipts',
-              icon: const Icon(Icons.receipt_long_outlined),
-            ),
-            IconButton(
-              onPressed: _busy || _syncing
-                  ? null
-                  : () => _startSync(force: true),
-              tooltip: 'Sync now',
-              icon: const Icon(Icons.sync),
-            ),
-          ],
         ),
         body: SafeArea(
-          child: SellingHome(
-            products: visible,
-            catalogEmpty: _products.isEmpty,
-            cart: _cart,
-            search: _search,
-            onSearch: () => setState(() {}),
-            categories: categories,
-            category: _category,
-            onCategory: (value) => setState(() => _category = value),
-            onQuantity: _changeQuantity,
-            status: _status,
-            deviceId: _deviceId,
-            pending: pending,
-            blocked: blocked,
-            busy: _busy,
-            syncing: _syncing,
-            locked:
-                _busy ||
-                _paying ||
-                widget.client.auth.currentUser?.id != _userId,
-            allowed: _allowed,
-            onAddProduct: widget.business.role == 'owner' ? _addProduct : null,
-            onRetry: !_busy && _store == null ? _retryOpen : null,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide =
+                  constraints.maxWidth >= 1000 &&
+                  MediaQuery.textScalerOf(context).scale(1) <= 1.5;
+              final home = SellingHome(
+                products: visible,
+                catalogEmpty: _products.isEmpty,
+                cart: _cart,
+                search: _search,
+                onSearch: () => setState(() {}),
+                categories: categories,
+                category: _category,
+                onCategory: (value) => setState(() => _category = value),
+                onQuantity: _changeQuantity,
+                status: _status,
+                deviceId: _deviceId,
+                pending: pending,
+                blocked: blocked,
+                busy: _busy,
+                syncing: _syncing,
+                locked:
+                    _busy ||
+                    _paying ||
+                    widget.client.auth.currentUser?.id != _userId,
+                allowed: _allowed,
+                onAddProduct: widget.business.role == 'owner'
+                    ? _addProduct
+                    : null,
+                onRetry: !_busy && _store == null ? _retryOpen : null,
+              );
+              Widget cartPanel() => CheckoutCart(
+                products: _products,
+                cart: _cart,
+                total: _total,
+                locked:
+                    _busy ||
+                    _paying ||
+                    widget.client.auth.currentUser?.id != _userId,
+                allowed: _allowed,
+                status: _status,
+                pending: pending,
+                blocked: blocked,
+                onQuantity: _changeQuantity,
+                onClear: () => setState(_cart.clear),
+                onCheckout: _checkout,
+                onClose: wide
+                    ? null
+                    : () => setState(() => _cartExpanded = false),
+              );
+              if (wide) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 8, 20, 20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: home),
+                      const SizedBox(width: 4),
+                      SizedBox(width: 340, child: cartPanel()),
+                    ],
+                  ),
+                );
+              }
+              return _cartExpanded
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: cartPanel(),
+                    )
+                  : home;
+            },
           ),
         ),
-        bottomNavigationBar: _cartBar(),
+        bottomNavigationBar:
+            MediaQuery.sizeOf(context).width >= 1000 &&
+                    MediaQuery.textScalerOf(context).scale(1) <= 1.5 ||
+                _cartExpanded
+            ? null
+            : _cartBar(),
       ),
     );
   }
