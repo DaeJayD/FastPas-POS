@@ -50,6 +50,8 @@ An earlier probe encountered a stale generated integration-test registrant. Norm
 
 The 14 November 2026 [Android emulator run](DEVICE_ACCEPTANCE.md#android-emulator-acceptance-on-14-november-2026) verified native offline cash checkout, process restart, original receipt upload, stock reconciliation, returns, cash shifts, reports and CSV saving on the current profile build. It used a dedicated development fixture. Emulator startup encountered OS-level warnings and host memory pressure, so this run provides functional evidence without a physical-phone performance claim. CSV contents matched; opening through an external viewer still needs a device with a compatible app.
 
+On 16 November 2026, all three [native SQLite recovery tests](DEVICE_ACCEPTANCE.md#repeatable-android-database-recovery-tests) passed on Android. Both older database layouts preserved pending records through upgrade, and interrupted-upload recovery preserved the original receipt and stock across reopening and concurrent route connections. These tests simulate the HTTP boundary and use the separate `com.fastpas.recoverycheck` package. They require no real account or cloud writes. All 206 ordinary Flutter tests passed with the opt-in hosted-write test skipped; static analysis was clean. The test APK belongs in `build/native-recovery/`; continue using `app-profile.apk` for the normal phone handoff.
+
 - Complete the physical two-phone outage, process restart and reconnect checks in [device acceptance](DEVICE_ACCEPTANCE.md).
 - Verify real email verification and password recovery links with the app running and closed.
 - Exercise the chosen production backend, Auth settings, tenant isolation and managed backup recovery.

@@ -4,7 +4,7 @@
 
 The default `lib/main.dart` launches business workspaces after [fresh Supabase setup](SETUP.md). Branch selection opens the new cash-selling flow. The historical single-store app is retained as `lib/legacy_main.dart`; its attendance and management features need adaptation before joining the workspace flow. Old-record migration is needed only if records are imported later.
 
-Owners add products, exact prices in centavos, and opening stock while online. Previously downloaded products can be sold for cash offline. SQLite commits the receipt, stock deductions, and pending upload in one transaction. Receipts remain available after restart. Currency is PHP; taxes, discounts, returns, shifts, providers, printers, and configured production receipt numbering are outside this development slice.
+Owners add products, exact prices in centavos, and opening stock while online. Previously downloaded products can be sold for cash offline. SQLite commits the receipt, stock deductions, and pending upload in one transaction. Receipts remain available after restart. Cash returns, cashier shifts and branch cash reports are also implemented; online return/shift operations retain stable request IDs for retries. Currency is PHP; taxes, discounts, payment providers, printers and configured production receipt numbering remain outside the initial release scope.
 
 ## Isolation and access
 
@@ -24,7 +24,7 @@ Phase 9A uploads up to 32 pending receipts in order on each pass. Failed uploads
 
 Two visits to the same local store serialize upload and stock refresh. While an upload is unconfirmed, the app keeps the previous stock snapshot and its local deductions. Catalog paging uses a product cursor so inserts before the cursor do not repeat rows. An item inserted before the cursor appears on the next complete refresh.
 
-The current Saved receipts list reads the local account/branch database. It does not download receipt history from other devices. Other enrolled devices refresh catalog and stock from the server; shared receipt reporting remains planned.
+The current Saved receipts list reads the local account/branch database. It does not download receipt history from other devices. Other enrolled devices refresh catalog and stock from the server. Branch cash reports aggregate synced sales, refunds and drawer closings from the backend; downloading other devices' individual receipts remains planned.
 
 Phase 6 separates receipt history from Home and reads it in cursor pages of summaries; opening detail loads one original payload. Home refresh reads grouped status counts. SQLite version 2 adds cached categories and a receipt-status index without changing saved sale payloads. The populated version-1 upgrade is tested. Product search/category filters work from the cached snapshot and keep cart selections. See [workspace sales](SALES.md) for cash review, quote revalidation and local retry behavior.
 
@@ -34,11 +34,11 @@ Local stock checks cannot prevent two disconnected devices selling the same rema
 
 ## Remaining release gates
 
-Attendance, reports across devices, suppliers, files, and calendar synchronization remain planned. Local Supabase, real email authentication, two-device airplane-mode/restart acceptance, production deployment, and independent backup restoration have not run. The development schema is deployed, with schema/grant readback and anonymous endpoint checks completed. Any future old-record import requires migration rehearsal. Local database encryption is not implemented. Do not clear app data with pending receipts.
+Attendance, suppliers, files and calendar synchronization remain planned. Real email delivery/callbacks, physical two-device outage acceptance, production deployment and managed Auth/file backup restoration remain open. The development schema, real hosted account/API isolation and an application-data restore have been verified for their documented scopes. Any future old-record import requires migration rehearsal. Local database encryption is not implemented. Do not clear app data with pending receipts.
 
-Tests use real SQLite files, mocked HTTP transport, and embedded PostgreSQL with Auth identity stubbed. These are separate from device and deployed-backend acceptance.
+Local tests use real SQLite files, mocked HTTP transport and embedded PostgreSQL with Auth identity stubbed. Separate hosted runners exercise real Auth/API requests. [Device acceptance](DEVICE_ACCEPTANCE.md) records the manual Android emulator run against the development backend and the repeatable native SQLite upgrade/recovery tests with simulated HTTP. Each result establishes a different verification layer.
 
-The default workspace Android debug APK builds with storage plugins, staff controls, and account recovery. Its ignored local configuration now targets the development backend. The sample preview's earlier emulator checks do not validate this new hybrid backend or its offline authentication on a device. All four SQL migrations are applied remotely to the development project; the authenticated and two-device acceptance checks remain pending.
+The normal Android profile APK uses the ignored development backend configuration. All eleven repository migrations were verified on that project on 13 November 2026. The later manual emulator check exercised native offline checkout, force-stop/reopen and actual backend sync. Sample preview checks remain separate from hybrid-backend acceptance. Physical two-device and production validation remain pending.
 
 Verification on 24 October 2026: all 120 Flutter tests pass serially, static analysis is clean, and all 95 embedded PostgreSQL checks pass. Branch-only revocation, receipt preservation, and uploading the original receipt after access restoration are now covered. The default Android debug APK rebuilt with placeholder backend values and the branch editor. Hosted backend and device acceptance remain separate outstanding checks.
 

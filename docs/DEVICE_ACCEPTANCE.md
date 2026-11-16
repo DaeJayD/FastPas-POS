@@ -31,6 +31,27 @@ The SDK's AVD creator initially wrote `target=android-0`. After correcting the i
 
 The emulator had no CSV viewer; **Open CSV** displayed the supported no-viewer message. External viewer handoff, physical two-phone checks, an upgrade preserving an older installed database, interrupted upload replies on Android, and real email verification/recovery callbacks remain pending. This single-emulator run does not close those gates or establish production readiness.
 
+## Repeatable Android database recovery tests
+
+The dedicated recovery suite exercises the public `LocalStore` and `SyncService` interfaces with Android's native `sqflite` plugin. It uses the same upgrade and recovery scenarios as the desktop SQLite tests. No acceptance credentials, hosted backend configuration or cloud writes are required. HTTP responses are simulated at the transport boundary, with no network fallback.
+
+On 16 November 2026, all three scenarios passed on the dedicated Android API 36.1 x86_64 emulator: version-1 upgrade, version-2 upgrade, and interrupted-upload recovery. The isolated test APK used `com.fastpas.recoverycheck`. The driver log and APK are retained in ignored `build/native-recovery/`. Host memory pressure still prevents a phone-performance conclusion.
+
+The suite opens populated version-1 and version-2 SQLite layouts with a pending receipt. It checks that upgrading and reopening preserve the receipt payload, stock deduction, cached access, branding and device identity. The upload scenario simulates a server commit followed by a lost reply, reopens SQLite, verifies the saved retry delay, and retries through two connections to the same store. It also checks that another account's file cannot inherit or upload that store's records.
+
+Run it against an explicitly selected Android emulator or test phone. The separate development package ID preserves the normal FastPas installation.
+
+```powershell
+$env:ORG_GRADLE_PROJECT_fastpasApplicationId = 'com.fastpas.recoverycheck'
+try {
+  flutter drive --driver=test_driver/native_recovery_driver.dart --target=integration_test/native_recovery_test.dart -d YOUR_ANDROID_SERIAL
+} finally {
+  Remove-Item Env:ORG_GRADLE_PROJECT_fastpasApplicationId
+}
+```
+
+This is a native database/plugin test with a simulated network boundary. It does not install an older APK, kill an operating-system process mid-transaction, interrupt a real hosted upload, or replace the physical two-device pilot. The earlier manual emulator run separately exercised actual radio disconnection, process force-stop and the development backend.
+
 ## Install and create the first account
 
 1. Build the default app with your ignored development configuration:
