@@ -60,3 +60,8 @@ On 16 November 2026, all three [native SQLite recovery tests](DEVICE_ACCEPTANCE.
 - Validate the production-signed bundle on physical Android hardware before publication.
 
 The development toolchain still reports Android Gradle Plugin and Kotlin deprecation warnings. Production publication remains pending these acceptance steps and the owner's store setup.
+
+
+## Studio UI validation on 17 November 2026
+
+The `dev-release` branch implements Forest/Porcelain appearance and responsive checkout, inventory and Overview. All 243 Flutter tests passed with the opt-in hosted write test skipped; static analysis was clean. A temporary-key acceptance AAB and the normal development profile APK both built and passed their signature checks. See [Studio validation](STUDIO_UI.md) for artifact identities, visual evidence, signing warnings and the exact scope of the checks. This does not close the physical-device, production-key or publication gates above.

@@ -59,6 +59,14 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       theme: Volt.theme,
       darkTheme: Volt.darkTheme,
       themeMode: mode,
+      themeAnimationDuration:
+          WidgetsBinding
+              .instance
+              .platformDispatcher
+              .accessibilityFeatures
+              .disableAnimations
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
       home: WorkspaceScreen(client: widget.client, account: _account),
     ),
   );

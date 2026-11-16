@@ -570,13 +570,7 @@ class _CatalogScreenState extends State<CatalogScreen>
             }
             final item = _visibleItems[index];
             final names = _labels
-                .where(
-                  (label) => [
-                    item.brand,
-                    item.category,
-                    item.family,
-                  ].contains(label.id),
-                )
+                .where((label) => label.id == item.category)
                 .map((label) => label.name)
                 .join(' · ');
             return InventoryCard(

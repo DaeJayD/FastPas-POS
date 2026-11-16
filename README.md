@@ -19,15 +19,11 @@ These workflows still require full end-to-end validation.
 
 ## Interface
 
-**Graphite Volt** uses charcoal (`#202528`), electric lime (`#CEF54A`), and a light gray background (`#EDF0F2`). Home opens directly to products, with search, category filters, quantity controls, and a persistent checkout bar.
+The release workspace uses the **Studio** interface with **Forest dark** (charcoal/forest surfaces and restrained lime) and **Porcelain light** (warm off-white, white cards and dark green text). The visible appearance switch saves a device preference without clearing the cart or changing accounts.
 
-<img src="docs/screenshots/home-phone.jpg" alt="FastPas POS product homepage running with sample data" width="300">
+Checkout adapts from compact phone cards and a cart action to products and cart side by side on wider screens. Inventory adds stock filters; Overview retains authorized cash reporting and adds explicitly scoped synced-sale and stock summaries. Critical offline, upload, access and stock warnings remain visible. See [Studio UI implementation and validation](docs/STUDIO_UI.md).
 
-*Flutter UI preview with sample data. No store transactions are saved. Products currently use category icons; barcode scanning is disabled and planned.*
-
-More screenshots: [tablet](docs/screenshots/home-tablet.jpg), [order review](docs/screenshots/order-review-phone.jpg), [payment](docs/screenshots/payment-phone.jpg), and [receipt](docs/screenshots/receipt-phone.jpg).
-
-Management previews: [staff](docs/screenshots/staff-phone.jpg), [suppliers](docs/screenshots/suppliers-phone.jpg), and [reports](docs/screenshots/reports-tablet.jpg).
+The screenshots below belong to the older sample-data preview, not the current release workspace: [phone](docs/screenshots/home-phone.jpg), [tablet](docs/screenshots/home-tablet.jpg), [payment](docs/screenshots/payment-phone.jpg) and [receipt](docs/screenshots/receipt-phone.jpg).
 
 ## Local UI preview
 

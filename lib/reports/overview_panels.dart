@@ -23,117 +23,19 @@ class OverviewPanels extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = details;
-    return Column(
+    final sellerPanel = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columns =
-                constraints.maxWidth >= 740 &&
-                    MediaQuery.textScalerOf(context).scale(1) <= 1.3
-                ? 3
-                : 1;
-            final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: width,
-                  child: StudioMetric(
-                    label: 'Net cash sales',
-                    value: displayCents(report.totals.net),
-                    detail: '${report.fromDay} to ${report.throughDay}',
-                    highlight: true,
-                  ),
-                ),
-                SizedBox(
-                  width: width,
-                  child: StudioMetric(
-                    label: 'Items sold',
-                    value: data == null ? '—' : '${data.itemsSold}',
-                    detail:
-                        'Latest ${data?.receiptCount ?? 0} synced receipts · before returns',
-                  ),
-                ),
-                SizedBox(
-                  width: width,
-                  child: StudioMetric(
-                    label: 'Stock attention',
-                    value: data == null ? '—' : '${data.stock.length}',
-                    detail: 'Current branch stock',
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        if (detailsLoading)
-          const Padding(
-            padding: EdgeInsets.all(12),
-            child: LinearProgressIndicator(),
-          ),
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              children: [
-                Text(error!, style: TextStyle(color: context.pos.warning)),
-                TextButton(
-                  onPressed: onRetry,
-                  child: const Text('Retry overview details'),
-                ),
-              ],
-            ),
-          ),
-        if (report.days.isNotEmpty && report.days.length <= 14) ...[
-          const SizedBox(height: 20),
-          const Text(
-            'Daily net cash sales',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          // Text and signed amounts remain accessible; negative days are not drawn as positive bars.
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 12,
-                children: [
-                  for (final day in report.days)
-                    SizedBox(
-                      width: 90,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            day.date.substring(5),
-                            style: TextStyle(
-                              color: context.pos.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            displayCents(day.totals.net),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 20),
         const Text(
           'Top sellers',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         Text(
-          'Latest ${data?.receiptCount ?? 0} synced receipts · units before returns',
+          data == null
+              ? (detailsLoading
+                    ? 'Loading synced receipts'
+                    : 'Details unavailable')
+              : 'Latest ${data.receiptCount} synced receipts · units before returns',
           style: TextStyle(color: context.pos.muted, fontSize: 12),
         ),
         const SizedBox(height: 12),
@@ -166,6 +68,11 @@ class OverviewPanels extends StatelessWidget {
                 ),
         ),
         const SizedBox(height: 20),
+      ],
+    );
+    final stockPanel = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         const Text(
           'Low stock',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
@@ -183,6 +90,7 @@ class OverviewPanels extends StatelessWidget {
                   child: Text('No stock needs attention'),
                 )
               : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final item in data.stock.take(10))
                       Padding(
@@ -215,6 +123,94 @@ class OverviewPanels extends StatelessWidget {
                       ),
                   ],
                 ),
+        ),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns =
+                constraints.maxWidth >= 740 &&
+                    MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                ? 3
+                : 1;
+            final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                  width: width,
+                  child: StudioMetric(
+                    label: 'Net cash sales',
+                    value: displayCents(report.totals.net),
+                    detail: '${report.fromDay} to ${report.throughDay}',
+                    highlight: true,
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: StudioMetric(
+                    label: 'Items sold',
+                    value: data == null ? '—' : '${data.itemsSold}',
+                    detail: data == null
+                        ? (detailsLoading
+                              ? 'Loading synced receipts'
+                              : 'Details unavailable')
+                        : 'Latest ${data.receiptCount} synced receipts · before returns',
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: StudioMetric(
+                    label: 'Stock attention',
+                    value: data == null ? '—' : '${data.stock.length}',
+                    detail: 'Current branch stock',
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        if (detailsLoading)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: LinearProgressIndicator(),
+          ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              children: [
+                Text(error!, style: TextStyle(color: context.pos.warning)),
+                TextButton(
+                  onPressed: onRetry,
+                  child: const Text('Retry overview details'),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 20),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 900 &&
+                MediaQuery.textScalerOf(context).scale(1) <= 1.5) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: sellerPanel),
+                  const SizedBox(width: 20),
+                  Expanded(flex: 2, child: stockPanel),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [sellerPanel, stockPanel],
+            );
+          },
         ),
         const SizedBox(height: 24),
       ],

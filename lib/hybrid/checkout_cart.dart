@@ -144,43 +144,57 @@ class CheckoutCart extends StatelessWidget {
   Widget build(BuildContext context) {
     final count = cart.values.fold(0, (sum, n) => sum + n);
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-            child: Text(
-              '$status\n$pending pending · $blocked need review',
-              style: TextStyle(
-                fontSize: 12,
-                color: blocked > 0 ? context.pos.warning : context.pos.muted,
-              ),
-            ),
-          ),
-          Expanded(
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _header(count)),
-                if (cart.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text('Your cart is empty'),
-                    ),
-                  ),
-                SliverList.builder(itemCount: cart.length, itemBuilder: _line),
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [const Divider(), _payment()],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final anchoredPayment =
+              constraints.maxHeight >= 560 &&
+              MediaQuery.textScalerOf(context).scale(1) <= 1.5;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                child: Text(
+                  '$status\n$pending pending · $blocked need review',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: blocked > 0
+                        ? context.pos.warning
+                        : context.pos.muted,
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: _header(count)),
+                    if (cart.isEmpty)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Text('Your cart is empty'),
+                        ),
+                      ),
+                    SliverList.builder(
+                      itemCount: cart.length,
+                      itemBuilder: _line,
+                    ),
+                    if (!anchoredPayment)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [const Divider(), _payment()],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (anchoredPayment) ...[const Divider(height: 1), _payment()],
+            ],
+          );
+        },
       ),
     );
   }

@@ -1,3 +1,6 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vasenizzpos/core/theme_preference.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -114,23 +117,30 @@ void main() {
   Future<void> open(
     WidgetTester tester, {
     Widget? home,
+    bool dark = false,
+    bool themeHost = false,
     Size size = const Size(360, 740),
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: Volt.theme,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: const TextScaler.linear(1.3)),
-          child: child!,
-        ),
-        home: home ?? screen(),
+    Widget app(ThemeMode mode) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: Volt.theme,
+      darkTheme: Volt.darkTheme,
+      themeMode: mode,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: const TextScaler.linear(1.3)),
+        child: child!,
       ),
+      home: home ?? screen(),
+    );
+    await tester.pumpWidget(
+      themeHost
+          ? PosThemeHost(builder: app)
+          : app(dark ? ThemeMode.dark : ThemeMode.light),
     );
     await settleStore(tester);
     await tester.pump(const Duration(milliseconds: 250));
@@ -144,62 +154,110 @@ void main() {
     }
   }
 
-  for (final size in [const Size(360, 740), const Size(1024, 800)]) {
-    testWidgets(
-      'Selling Home fits ${size.width} with large text and a persistent cart',
-      (tester) async {
-        await tester.runAsync(
-          () => store.replaceSnapshot([
-            for (var i = 0; i < 8; i++)
-              {
-                'id': 'item-$i',
-                'name': i == 0
-                    ? 'Coffee beans with an especially long product variant name'
-                    : 'Product $i',
-                'sku': 'SKU-$i',
-                'price_cents': 1999,
-                'quantity': i == 7 ? 0 : 10,
-                'category_id': i < 4 ? 'drinks' : 'food',
-                'category_name': i < 4 ? 'Drinks' : 'Food',
-              },
-          ], 'owner'),
-        );
-        await open(tester, size: size);
-        try {
-          await tester.pumpAndSettle();
-          await capture(
-            tester,
-            size.width < 600 ? 'selling-home-phone' : 'selling-home-tablet',
+  for (final dark in [false, true]) {
+    for (final size in [
+      const Size(360, 740),
+      const Size(1024, 800),
+      const Size(1440, 960),
+    ]) {
+      testWidgets(
+        'Selling Home fits ${size.width} in ${dark ? 'Forest' : 'Porcelain'} with large text and a persistent cart',
+        (tester) async {
+          await tester.runAsync(
+            () => store.replaceSnapshot([
+              for (var i = 0; i < 8; i++)
+                {
+                  'id': 'item-$i',
+                  'name': i == 0
+                      ? 'Coffee beans with an especially long product variant name'
+                      : 'Product $i',
+                  'sku': 'SKU-$i',
+                  'price_cents': 1999,
+                  'quantity': i == 7 ? 0 : 10,
+                  'category_id': i < 4 ? 'drinks' : 'food',
+                  'category_name': i < 4 ? 'Drinks' : 'Food',
+                },
+            ], 'owner'),
           );
-          await tester.ensureVisible(find.byTooltip('Add one').first);
-          await tester.ensureVisible(find.byTooltip('Add one').first);
-          await tester.pumpAndSettle();
-          await tester.tap(find.byTooltip('Add one').first);
-          await tester.pumpAndSettle();
-          expect(find.text('1 item in cart'), findsOneWidget);
-          expect(find.text('Cash checkout · ₱19.99'), findsOneWidget);
-          await tester.scrollUntilVisible(
-            find.text('Product 7'),
-            300,
-            scrollable: find.byType(Scrollable).first,
-          );
-          expect(find.text('Cash checkout · ₱19.99'), findsOneWidget);
-          expect(
-            tester
-                .getRect(
-                  find.widgetWithText(FilledButton, 'Cash checkout · ₱19.99'),
-                )
-                .bottom,
-            lessThanOrEqualTo(size.height),
-          );
-          expect(tester.takeException(), isNull);
-        } finally {
-          await tester.pumpWidget(const SizedBox.shrink());
-          await settleStore(tester);
-        }
-      },
-    );
+          SharedPreferences.setMockInitialValues({
+            'fastpas.appearance': dark ? 'dark' : 'light',
+          });
+          await open(tester, size: size, dark: dark, themeHost: true);
+          try {
+            await tester.pumpAndSettle();
+            await capture(
+              tester,
+              'checkout-${dark ? 'forest' : 'porcelain'}-${size.width.toInt()}',
+            );
+            await tester.ensureVisible(find.byTooltip('Add one').first);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byTooltip('Add one').first);
+            await tester.pumpAndSettle();
+            expect(find.text('1 item in cart'), findsOneWidget);
+            await capture(
+              tester,
+              'checkout-${dark ? 'forest' : 'porcelain'}-${size.width.toInt()}-cart',
+            );
+            expect(find.text('Cash checkout · ₱19.99'), findsOneWidget);
+            await tester.scrollUntilVisible(
+              find.text('Product 7'),
+              300,
+              scrollable: find.byType(Scrollable).first,
+            );
+            expect(find.text('Cash checkout · ₱19.99'), findsOneWidget);
+            expect(
+              tester
+                  .getRect(
+                    find.widgetWithText(FilledButton, 'Cash checkout · ₱19.99'),
+                  )
+                  .bottom,
+              lessThanOrEqualTo(size.height),
+            );
+            expect(tester.takeException(), isNull);
+          } finally {
+            await tester.pumpWidget(const SizedBox.shrink());
+            await settleStore(tester);
+          }
+        },
+      );
+    }
   }
+
+  testWidgets(
+    'Changing theme preserves the real offline cart and its quantity controls',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'fastpas.appearance': 'dark'});
+      await open(
+        tester,
+        themeHost: true,
+        home: screen(sync: (_) async => throw const SocketException('Offline')),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byTooltip('Add one').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Add one').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View cart'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Switch to Porcelain light'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 item in cart'), findsOneWidget);
+      expect(find.textContaining('Not synchronized'), findsOneWidget);
+      await tester.ensureVisible(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Add one'));
+      await tester.pumpAndSettle();
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('Cash checkout · ₱50.00'), findsOneWidget);
+      expect(
+        (await SharedPreferences.getInstance()).getString('fastpas.appearance'),
+        'light',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleStore(tester);
+    },
+  );
 
   testWidgets('Local search matches name and SKU without losing the cart', (
     tester,
@@ -297,6 +355,11 @@ void main() {
       await tester.ensureVisible(find.byTooltip('Add one').first);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Add one').first);
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byType(CustomScrollView).first,
+        const Offset(0, 1000),
+      );
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Drinks'));
       await tester.tap(find.widgetWithText(ChoiceChip, 'Drinks'));
@@ -872,56 +935,70 @@ void main() {
     }
   });
 
-  testWidgets('Cash dialog validates in place above the phone keyboard', (
-    tester,
-  ) async {
-    await open(tester);
-    try {
-      await tester.ensureVisible(find.byTooltip('Add one'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Add one'));
-      await tester.pumpAndSettle();
-      await capture(tester, 'selling');
-      await tester.tap(find.text('Cash checkout · ₱25.00'));
-      await tester.pumpAndSettle();
-      await capture(tester, 'cash-payment');
-      tester.view.viewInsets = const FakeViewPadding(bottom: 280);
-      await tester.pumpAndSettle();
-      final cash = find.byType(TextFormField);
-      await tester.enterText(cash, '1.00');
-      await tester.tap(find.text('Complete sale'));
-      await tester.pumpAndSettle();
-      expect(find.text('Cash must cover the total due.'), findsOneWidget);
-      expect((await tester.runAsync(store.receipts))!, isEmpty);
-      await tester.enterText(cash, '30.00');
-      await tester.tap(find.text('Complete sale'));
-      await settleStore(tester);
-      await tester.pump(const Duration(milliseconds: 350));
-      for (
-        var i = 0;
-        i < 40 && find.text('Sale saved on this device').evaluate().isEmpty;
-        i++
-      ) {
-        await settleStore(tester);
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-      expect(find.text('Sale saved on this device'), findsOneWidget);
-      expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is SelectableText &&
-              (widget.data?.contains('Change ₱5.00') ?? false),
-        ),
-        findsOneWidget,
-      );
-      expect((await tester.runAsync(store.receipts))!.length, 1);
-      expect(tester.takeException(), isNull);
-    } finally {
-      tester.view.resetViewInsets();
-      await tester.pumpWidget(const SizedBox.shrink());
-      await settleStore(tester);
-    }
-  });
+  for (final dark in [false, true]) {
+    testWidgets(
+      'Cash dialog validates above the keyboard in ${dark ? 'Forest' : 'Porcelain'}',
+      (tester) async {
+        await open(tester, dark: dark);
+        try {
+          await tester.ensureVisible(find.byTooltip('Add one'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('Add one'));
+          await tester.pumpAndSettle();
+          await capture(tester, 'selling-${dark ? 'forest' : 'porcelain'}');
+          await tester.tap(find.text('Cash checkout · ₱25.00'));
+          await tester.pumpAndSettle();
+          await capture(
+            tester,
+            'cash-payment-${dark ? 'forest' : 'porcelain'}',
+          );
+          tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+          await tester.pumpAndSettle();
+          final cash = find.byType(TextFormField);
+          await tester.enterText(cash, '1.00');
+          await tester.tap(find.text('Complete sale'));
+          await tester.pumpAndSettle();
+          expect(find.text('Cash must cover the total due.'), findsOneWidget);
+          await capture(
+            tester,
+            'cash-keyboard-${dark ? 'forest' : 'porcelain'}',
+          );
+          expect(
+            tester.getRect(find.text('Complete sale')).bottom,
+            lessThan(460),
+          );
+          expect((await tester.runAsync(store.receipts))!, isEmpty);
+          await tester.enterText(cash, '30.00');
+          await tester.tap(find.text('Complete sale'));
+          await settleStore(tester);
+          await tester.pump(const Duration(milliseconds: 350));
+          for (
+            var i = 0;
+            i < 40 && find.text('Sale saved on this device').evaluate().isEmpty;
+            i++
+          ) {
+            await settleStore(tester);
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(find.text('Sale saved on this device'), findsOneWidget);
+          expect(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is SelectableText &&
+                  (widget.data?.contains('Change ₱5.00') ?? false),
+            ),
+            findsOneWidget,
+          );
+          expect((await tester.runAsync(store.receipts))!.length, 1);
+          expect(tester.takeException(), isNull);
+        } finally {
+          tester.view.resetViewInsets();
+          await tester.pumpWidget(const SizedBox.shrink());
+          await settleStore(tester);
+        }
+      },
+    );
+  }
 
   testWidgets(
     'A product form from a previous account cannot submit after an account switch',

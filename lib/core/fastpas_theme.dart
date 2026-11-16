@@ -196,7 +196,11 @@ abstract final class Volt {
           disabledBackgroundColor: p.subtle,
           disabledForegroundColor: p.muted,
           minimumSize: const Size(48, 52),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -223,7 +227,7 @@ abstract final class Volt {
       chipTheme: ChipThemeData(
         backgroundColor: p.surface,
         selectedColor: p.accentSoft,
-        labelStyle: TextStyle(color: p.text),
+        labelStyle: TextStyle(fontFamily: 'Roboto', color: p.text),
         side: BorderSide(color: p.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),

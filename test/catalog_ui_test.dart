@@ -1,3 +1,5 @@
+import 'package:vasenizzpos/core/theme_preference.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -192,32 +194,41 @@ void main() {
     WidgetTester tester, {
     double width = 360,
     bool waitForJson = false,
+    bool dark = false,
   }) async {
     tester.view.physicalSize = Size(width, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetViewInsets);
+    await (await SharedPreferences.getInstance()).setString(
+      'fastpas.appearance',
+      dark ? 'dark' : 'light',
+    );
     await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: Volt.theme,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: const TextScaler.linear(1.3)),
-          child: child!,
-        ),
-        home: CatalogScreen(
-          client: client,
-          business: const BusinessWorkspace(
-            id: 'business',
-            name: 'Shop',
-            role: 'owner',
+      PosThemeHost(
+        builder: (mode) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: Volt.theme,
+          darkTheme: Volt.darkTheme,
+          themeMode: mode,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(1.3)),
+            child: child!,
           ),
-          branch: const WorkspaceBranch(
-            id: 'main',
-            businessId: 'business',
-            name: 'Main',
+          home: CatalogScreen(
+            client: client,
+            business: const BusinessWorkspace(
+              id: 'business',
+              name: 'Shop',
+              role: 'owner',
+            ),
+            branch: const WorkspaceBranch(
+              id: 'main',
+              businessId: 'business',
+              name: 'Main',
+            ),
           ),
         ),
       ),
@@ -566,22 +577,31 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  for (final width in [360.0, 1024.0]) {
-    testWidgets('Catalog and movement history fit $width with larger text', (
-      tester,
-    ) async {
-      await open(tester, width: width);
-      expect(find.text('Water'), findsOneWidget);
-      await capture(tester, 'catalog-$width');
-      final tab = find.widgetWithText(Tab, 'Movements');
-      await tester.ensureVisible(tab);
-      await tester.tap(tab);
-      await tester.pumpAndSettle();
-      expect(find.text('Opening stock'), findsOneWidget);
-      await capture(tester, 'movements-$width');
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+  for (final dark in [false, true]) {
+    for (final width in [320.0, 1024.0, 1440.0]) {
+      testWidgets(
+        'Catalog and movement history fit $width in ${dark ? 'Forest' : 'Porcelain'} with larger text',
+        (tester) async {
+          await open(tester, width: width, dark: dark);
+          expect(find.text('Water'), findsOneWidget);
+          await capture(
+            tester,
+            'inventory-${dark ? 'forest' : 'porcelain'}-${width.toInt()}',
+          );
+          final tab = find.widgetWithText(Tab, 'Movements');
+          await tester.ensureVisible(tab);
+          await tester.tap(tab);
+          await tester.pumpAndSettle();
+          expect(find.text('Opening stock'), findsOneWidget);
+          await capture(
+            tester,
+            'movements-${dark ? 'forest' : 'porcelain'}-${width.toInt()}',
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
   }
   testWidgets(
     'A lost transfer reply retries the same request and destination version',
@@ -671,4 +691,63 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+  for (final dark in [false, true]) {
+    testWidgets(
+      'Inventory stock filters and empty state in ${dark ? 'Forest' : 'Porcelain'}',
+      (tester) async {
+        Map<String, dynamic> row(String id, int amount, int threshold) => {
+          'id': id,
+          'business_id': 'business',
+          'name': id,
+          'base_name': id,
+          'sku': id.toUpperCase(),
+          'price_cents': 100,
+          'active': true,
+          'version': 1,
+          'quantity': amount,
+          'stock_version': 1,
+          'low_stock_threshold': threshold,
+          'variant_label': '',
+        };
+        catalogReply = (_) async => [
+          row('Healthy tea', 20, 0),
+          row('Low coffee', 2, 3),
+          row('Empty milk', 0, 0),
+        ];
+        await open(tester, dark: dark);
+        await tester.tap(
+          find.byWidgetPredicate(
+            (w) => w is DropdownButton<String> && w.value == 'All stock',
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Stock attention').last);
+        await tester.pumpAndSettle();
+        expect(find.text('Healthy tea'), findsNothing);
+        expect(find.text('Low coffee'), findsOneWidget);
+        expect(find.text('Empty milk'), findsOneWidget);
+        await tester.tap(
+          find.byWidgetPredicate(
+            (w) => w is DropdownButton<String> && w.value == 'Stock attention',
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Out of stock').last);
+        await tester.pumpAndSettle();
+        expect(find.text('Low coffee'), findsNothing);
+        expect(find.text('Empty milk'), findsOneWidget);
+        quantity = 10;
+        catalogReply = (_) async => [row('Healthy tea', 20, 0)];
+        await tester.tap(find.byTooltip('Refresh inventory'));
+        await tester.pumpAndSettle();
+        expect(find.text('No matching products.'), findsOneWidget);
+        expect(
+          requests.where((r) => r.url.path.endsWith('/pos_post_stock')),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 }

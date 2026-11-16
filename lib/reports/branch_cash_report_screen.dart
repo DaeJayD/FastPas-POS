@@ -152,8 +152,9 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
         widget.repository.businessId,
         widget.repository.actor,
       ).load(report.branchId);
-      if (mounted && _request == request && !_accountChanged)
+      if (mounted && _request == request && !_accountChanged) {
         setState(() => _overview = details);
+      }
     } catch (_) {
       if (mounted && _request == request && !_accountChanged) {
         setState(
@@ -162,8 +163,9 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
         );
       }
     } finally {
-      if (mounted && _request == request && !_accountChanged)
+      if (mounted && _request == request && !_accountChanged) {
         setState(() => _overviewLoading = false);
+      }
     }
   }
 
@@ -267,14 +269,22 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _timezone,
-          decoration: const InputDecoration(
-            labelText: 'Reporting time zone',
-            hintText: 'Asia/Manila',
-          ),
-          onChanged: (_) => setState(_clearReport),
-          onSubmitted: (_) => _load(),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('Report options'),
+          subtitle: Text(_timezone.text),
+          children: [
+            TextField(
+              controller: _timezone,
+              decoration: const InputDecoration(
+                labelText: 'Reporting time zone',
+                hintText: 'Asia/Manila',
+              ),
+              onChanged: (_) => setState(_clearReport),
+              onSubmitted: (_) => _load(),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
         const SizedBox(height: 12),
         FilledButton(
@@ -302,10 +312,6 @@ class _BranchCashReportScreenState extends State<BranchCashReportScreen> {
             onRetry: () => _loadOverview(report, _request),
           ),
           const SizedBox(height: 12),
-          Text(
-            'Net cash sales ${displayCents(totals.net)}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
           Text(
             'Gross sales ${displayCents(totals.gross)} · ${totals.saleCount} receipts',
           ),

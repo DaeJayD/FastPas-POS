@@ -55,8 +55,9 @@ class OverviewDetailsRepository {
       }
       for (final line in (row['payload'] as Map)['items'] as List) {
         final quantity = line['quantity'] as int;
-        if (quantity < 0)
+        if (quantity < 0) {
           throw const FormatException('Invalid receipt quantities.');
+        }
         units += quantity;
         final id = line['product_id'] as String;
         final seller = sellers.putIfAbsent(
@@ -110,8 +111,9 @@ class OverviewDetailsRepository {
       }
       if (page.length < 500) break;
       final next = page.last['product_id'] as String;
-      if (after == next)
+      if (after == next) {
         throw const FormatException('Stock cursor did not advance.');
+      }
       after = next;
     }
     final ranked = sellers.values.toList()

@@ -53,6 +53,7 @@ class SellingHome extends StatelessWidget {
           backgroundColor: context.pos.surface,
           showCheckmark: false,
           labelStyle: TextStyle(
+            fontFamily: 'Roboto',
             color: category == value
                 ? Theme.of(context).colorScheme.primary
                 : context.pos.muted,
@@ -288,7 +289,7 @@ class SellingHome extends StatelessWidget {
                   crossAxisCount: columns,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  mainAxisExtent: 270 + (scale - 1).clamp(0, 2) * 180,
+                  mainAxisExtent: 225 + (scale - 1).clamp(0, 2) * 130,
                 ),
                 itemCount: products.length,
                 itemBuilder: tile,

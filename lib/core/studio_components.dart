@@ -14,7 +14,7 @@ class StockBadge extends StatelessWidget {
             ? quantity <= 5
             : threshold! > 0 && quantity <= threshold!);
     final label = quantity < 0
-        ? 'Stock needs review'
+        ? 'Stock needs review · $quantity'
         : quantity == 0
         ? 'Out of stock'
         : warning
@@ -62,6 +62,8 @@ class ProductThumbnail extends StatelessWidget {
           ? Image.network(
               uri.toString(),
               fit: BoxFit.cover,
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
               excludeFromSemantics: true,
               errorBuilder: (_, _, _) => fallback(),
             )

@@ -498,6 +498,30 @@ class _HybridPosScreenState extends State<HybridPosScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_receiptCounts.pending > 0 || _receiptCounts.blocked > 0)
+                TextButton.icon(
+                  onPressed:
+                      _store == null ||
+                          _busy ||
+                          _paying ||
+                          widget.client.auth.currentUser?.id != _userId
+                      ? null
+                      : _history,
+                  icon: Icon(
+                    _receiptCounts.blocked > 0
+                        ? Icons.error_outline
+                        : Icons.cloud_upload_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    'Uploads: ${_receiptCounts.pending} queued · ${_receiptCounts.blocked} to review',
+                  ),
+                ),
+              if (!_allowed && !_busy)
+                Text(
+                  'Selling access needs verification',
+                  style: TextStyle(color: context.pos.warning, fontSize: 12),
+                ),
               Row(
                 children: [
                   const Icon(Icons.shopping_bag_outlined, size: 20),
@@ -564,7 +588,13 @@ class _HybridPosScreenState extends State<HybridPosScreen>
       canPop: !_busy,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Checkout'),
+          title: const Row(
+            children: [
+              SizedBox(width: 20, height: 18, child: FastPasMark()),
+              SizedBox(width: 10),
+              Flexible(child: Text('Checkout')),
+            ],
+          ),
           actions: const [ThemeSwitch()],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(48),

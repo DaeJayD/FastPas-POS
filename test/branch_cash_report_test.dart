@@ -142,7 +142,7 @@ void main() {
       await waitFor(find.text('Cash reports'));
       await tester.ensureVisible(find.text('Cash reports'));
       await tester.tap(find.text('Cash reports'));
-      await waitFor(find.text('Net cash sales ₱15.00'));
+      await waitFor(find.text('₱15.00'));
       expect(calls.single, {
         'p_business': 'business',
         'p_branch': 'branch',
@@ -164,7 +164,7 @@ void main() {
       );
       delayed.complete();
       await waitFor(find.text('Account changed. Return to your businesses.'));
-      expect(find.text('Net cash sales ₱15.00'), findsNothing);
+      expect(find.text('₱15.00'), findsNothing);
       expect(find.text('Save CSV'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     },
