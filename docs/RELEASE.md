@@ -65,3 +65,8 @@ The development toolchain still reports Android Gradle Plugin and Kotlin depreca
 ## Studio UI validation on 17 November 2026
 
 The `dev-release` branch implements Forest/Porcelain appearance and responsive checkout, inventory and Overview. All 243 Flutter tests passed with the opt-in hosted write test skipped; static analysis was clean. A temporary-key acceptance AAB and the normal development profile APK both built and passed their signature checks. See [Studio validation](STUDIO_UI.md) for artifact identities, visual evidence, signing warnings and the exact scope of the checks. This does not close the physical-device, production-key or publication gates above.
+
+
+## Authenticated Studio validation on 19 November 2026
+
+The updated Studio app passed an authenticated single-emulator run against its isolated development fixture: native cash validation, offline receipt restart, original-ID reconnect without another deduction, repeated sync, inventory filters and actual Overview totals. The run found and reproduced a cramped landscape footer; the short-screen layout now keeps cart and payment side by side. [Studio validation](STUDIO_UI.md#authenticated-android-validation-on-19-november-2026) records the run, regression and latest artifact results. Physical two-phone testing, real email callbacks, owner-controlled signing and production acceptance remain open.

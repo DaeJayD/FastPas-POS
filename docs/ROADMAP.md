@@ -190,3 +190,6 @@ On 16 November 2026, all three [repeatable Android recovery scenarios](DEVICE_AC
 ### Studio UI release implementation
 
 On 17 November 2026, `dev-release` adds the Studio layout with persisted Forest/Porcelain themes, responsive checkout/cart controls, inventory stock filtering and scoped Overview summaries. Existing cashier/management navigation and transactional safeguards remain. All 243 Flutter tests passed (one opt-in hosted test skipped), analysis was clean, and acceptance AAB/profile APK builds completed. [Studio implementation and validation](STUDIO_UI.md) records the available data, bounded summaries, signed artifact identities and remaining installed-device/store acceptance. Phase 10 remains release validation until those independent gates are met.
+
+
+On 19 November 2026, the current Studio profile APK completed authenticated Android emulator checkout, offline force-stop/reopen, original receipt synchronization, repeated sync, inventory filters and report reconciliation. Its dedicated test fixture retained one additional sale with one stock deduction. A short-landscape product-space regression led to a compact cart/payment footer. See [Studio validation](STUDIO_UI.md#authenticated-android-validation-on-19-november-2026); physical and production release gates remain separate.

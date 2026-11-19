@@ -485,6 +485,18 @@ class _HybridPosScreenState extends State<HybridPosScreen>
 
   Widget _cartBar() {
     final count = _cart.values.fold(0, (sum, quantity) => sum + quantity);
+    final size = MediaQuery.sizeOf(context);
+    final compact =
+        size.height < 480 &&
+        size.width >= 600 &&
+        MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+    final payment = FilledButton.icon(
+      onPressed: _busy || _paying || !_allowed || _cart.isEmpty
+          ? null
+          : _checkout,
+      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+      label: Text('Cash checkout · ${displayCents(_total)}'),
+    );
     return Container(
       decoration: BoxDecoration(
         color: context.pos.surface,
@@ -522,33 +534,46 @@ class _HybridPosScreenState extends State<HybridPosScreen>
                   'Selling access needs verification',
                   style: TextStyle(color: context.pos.warning, fontSize: 12),
                 ),
-              Row(
-                children: [
-                  const Icon(Icons.shopping_bag_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      count == 0
-                          ? 'Your cart is empty'
-                          : '$count ${count == 1 ? 'item' : 'items'} in cart',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+              if (compact)
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextButton.icon(
+                        onPressed: () => setState(() => _cartExpanded = true),
+                        icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                        label: Text(
+                          'View cart · $count ${count == 1 ? 'item' : 'items'}',
+                        ),
+                      ),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => setState(() => _cartExpanded = true),
-                    icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                    label: const Text('View cart'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              FilledButton.icon(
-                onPressed: _busy || _paying || !_allowed || _cart.isEmpty
-                    ? null
-                    : _checkout,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                label: Text('Cash checkout · ${displayCents(_total)}'),
-              ),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 3, child: payment),
+                  ],
+                )
+              else ...[
+                Row(
+                  children: [
+                    const Icon(Icons.shopping_bag_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        count == 0
+                            ? 'Your cart is empty'
+                            : '$count ${count == 1 ? 'item' : 'items'} in cart',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _cartExpanded = true),
+                      icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                      label: const Text('View cart'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                payment,
+              ],
             ],
           ),
         ),

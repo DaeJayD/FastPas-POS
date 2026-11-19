@@ -35,3 +35,39 @@ Complete the outstanding physical two-phone outage/restart/reconnect checks, rea
 
 
 For the installed-phone UI check, update the existing development install without clearing data. In both appearances, search/filter products and inventory, add/remove cart quantities, open/cancel cash payment with the keyboard visible, and verify the authoritative report totals. Repeat with larger system text and landscape. With a dedicated pending test receipt, check that the upload/review state remains reachable after switching appearance and restarting. Measure cold loading/navigation separately on the physical target phone; this work does not claim a measured speed improvement.
+
+
+## Authenticated Android validation on 19 November 2026
+
+The 17 November profile artifact (`59cec6b`, SHA-256 above) was exercised on the dedicated API 36.1 x86_64 emulator with the existing verified development Owner and isolated emulator fixture. No app data was cleared. Initial fixture stock was ten, its price was ₱30, and it had one earlier synced receipt.
+
+| Check | Observed result |
+|---|---|
+| Actual branch catalog and SKU search | The intended branch downloaded; `EMU` matched its product at ₱30 with ten units. |
+| Cart and appearance | Quantities changed 1 → 2 → 1 with totals ₱30 → ₱60 → ₱30. Switching Forest/Porcelain kept the cart. |
+| Cash and keyboard | With Wi-Fi and mobile data disabled, ₱1 tender was rejected without leaving the form. Labels, error, remaining amount and confirmation remained readable above the actual numeric keyboard. Exact ₱30 tender saved one pending receipt. |
+| Native persistence | Local stock became nine while hosted stock remained ten. After force-stop/relaunch offline, the same receipt ID, timestamp, cash, product/price and branding remained pending, stock stayed nine, and Forest remained selected. The pending-upload action stayed visible. |
+| Reconnect and repeat sync | Original receipt became synced, history showed zero pending/two synced, and hosted readback showed exactly one matching new ID with nine stock. Two later manual syncs preserved these figures. |
+| Inventory | The current branch showed ₱30 and nine stock in both themes. Out of stock and a no-match search showed the empty state; In stock restored the product. The product dialog remained reachable with the native keyboard and was canceled without creating a product. |
+| Overview | Both themes showed actual summaries: net cash ₱30, two units before returns, zero stock alerts and the intended top seller. Gross ₱55 minus the previous ₱25 refund reconciled to net ₱30. A separate verified Owner API report matched the branch, dates, receipt count and amounts. |
+
+One new test receipt was retained in the development fixture. No product price, manual stock adjustment, role, migration or production setting was changed. Private receipt IDs, raw UI evidence and the run manifest remain in ignored `config/studio-native-20261119.local.json` and `build/studio-authenticated/`.
+
+### Landscape follow-up
+
+The native run exposed a cramped short-screen layout: the two-row checkout footer left only 81 logical pixels for products with Android system insets. A regression reproduced it in both themes. On short, sufficiently wide screens at ordinary text scale, cart summary and payment now share one row; upload/review and access warnings retain their existing controls. Narrow phones and larger-text layouts keep the stacked presentation. The regression verifies available product space, reachable quantity controls, payment placement and opening the selected cart. Fresh `flutter analyze --no-pub` completed with no issues. All 245 ordinary Flutter tests passed, with the opt-in hosted-write test skipped; both new landscape regressions also passed the Flutter screenshot run. Updated packaging and installed-artifact results follow below.
+
+
+### Updated artifacts on 19 November 2026
+
+Both artifacts were rebuilt after the landscape refinement and passed signature verification. They replace the earlier files at the same ignored paths; the 17 November hashes above remain historical evidence.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `build/app/outputs/flutter-apk/app-profile.apk` | 110,123,714 | `83437f3699ba4a49a3d2151e67a67bdbef25ec3305af6e8190979386f9c4b24c` |
+| `build/acceptance/fastpas-studio-ui-acceptance.aab` | 55,407,367 | `1605990cb1b74da3d641c401d764f1ab8455557e49a38a743e068d5480e5742a` |
+
+The APK retains `com.example.vasenizzpos` and the existing Android Debug v2 signature. The bundle retains `com.fastpas.acceptance` and a temporary test certificate; `jarsigner` reported `jar verified` with the same test-certificate/manifest-order warnings described above. Temporary signing properties and the private test key were removed. Existing toolchain deprecation warnings remain. These files are development/acceptance artifacts, not owner-signed publication artifacts.
+
+
+The rebuilt APK was installed as an update without clearing data. Its installed `base.apk` SHA-256 matched the new profile artifact above. The signed-in workspace and nine-unit stock survived the update. In actual landscape, the compact footer, quantity control, cart opening and frozen cash review were exercised in both themes. Canceling payment kept the cart; clearing the cart created no additional sale. The account was signed out after the zero-pending state was verified. This validates the new installed footer path; the earlier offline/reconnect sequence used the 17 November APK as identified above. Physical two-phone, email callback and production acceptance remain open.

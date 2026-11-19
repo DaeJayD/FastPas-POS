@@ -223,6 +223,48 @@ void main() {
     }
   }
 
+  for (final dark in [false, true]) {
+    testWidgets(
+      'Short landscape checkout leaves room for product controls $dark',
+      (tester) async {
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        await open(tester, size: const Size(760, 360), dark: dark);
+        try {
+          await tester.pumpAndSettle();
+          // Keep at least two touch-target rows available below system/app bars.
+          final products = find.byType(CustomScrollView).first;
+          expect(tester.getSize(products).height, greaterThanOrEqualTo(120));
+          final add = find.byTooltip('Add one');
+          await tester.scrollUntilVisible(
+            add,
+            120,
+            scrollable: find.byType(Scrollable).first,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          final pay = find.widgetWithText(
+            FilledButton,
+            'Cash checkout · ₱25.00',
+          );
+          expect(pay, findsOneWidget);
+          expect(tester.getRect(pay).bottom, lessThanOrEqualTo(336));
+          await capture(tester, 'landscape-${dark ? 'forest' : 'porcelain'}');
+          await tester.tap(find.textContaining('View cart'));
+          await tester.pumpAndSettle();
+          expect(find.text('1 item in cart'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        } finally {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await settleStore(tester);
+        }
+      },
+    );
+  }
+
   testWidgets(
     'Changing theme preserves the real offline cart and its quantity controls',
     (tester) async {
